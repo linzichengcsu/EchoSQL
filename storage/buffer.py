@@ -152,6 +152,16 @@ class BufferPool:
             self._fm.write_page(page_id, page.data)
             page.dirty = False
 
+    def invalidate_page(self, page_id: int) -> None:
+        """将页从缓存中移除(脏页先刷盘)。
+
+        供上层「释放页」前调用,避免释放后缓存残留导致页被
+        再分配时命中过期的缓存内容。
+        """
+        page = self._cache.pop(page_id, None)
+        if page is not None and page.dirty:
+            self._fm.write_page(page_id, page.data)
+
     def flush_all(self) -> int:
         """刷盘全部脏页,返回刷盘页数(Checkpoint,FR-2.4)。"""
         count = 0

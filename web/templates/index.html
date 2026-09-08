@@ -4,7 +4,7 @@
   <meta charset="UTF-8">
   <title>MiniDB Web Console</title>
   <style>
-    body { font-family: "Segoe UI", "Microsoft YaHei", sans-serif; margin: 2rem auto; max-width: 720px;
+    body { font-family: "Segoe UI", "Microsoft YaHei", sans-serif; margin: 2rem auto; max-width: 860px;
            color: #222; background: #f7f8fa; }
     h1 { border-bottom: 2px solid #2b6cb0; padding-bottom: .4rem; }
     code { background: #eef; padding: .1rem .4rem; border-radius: 4px; }
@@ -12,15 +12,34 @@
     th, td { border: 1px solid #ccc; padding: .45rem .7rem; text-align: left; }
     th { background: #e8eef7; }
     .ok { color: #1a7f37; font-weight: bold; }
+    .err { color: #b00020; font-weight: bold; }
+    textarea { width: 100%; font-family: Consolas, monospace; font-size: 13px;
+               border: 1px solid #bbb; border-radius: 4px; padding: .5rem; box-sizing: border-box; }
+    button { margin-top: .5rem; padding: .45rem 1.2rem; background: #2b6cb0; color: #fff;
+             border: none; border-radius: 4px; cursor: pointer; }
+    button:hover { background: #2c5282; }
+    #result { margin-top: 1rem; }
+    #result .msg { padding: .6rem; background: #fff; border: 1px solid #ddd; border-radius: 4px; }
     footer { margin-top: 2rem; color: #888; font-size: .85rem; }
   </style>
 </head>
 <body>
   <h1>MiniDB Web Console</h1>
-  <p>数据库管理系统课程设计 · Flask 开发环境骨架
-     （SQL 编译器 / 存储系统 / 数据库引擎 将在后续阶段接入）</p>
+  <p>数据库管理系统课程设计 · Flask Web 控制台
+     （SQL 编译器 → 数据库引擎 → 页式存储 完整链路）</p>
 
-  <p>健康检查：<span class="ok">/api/health</span></p>
+  <h2>SQL 控制台</h2>
+  <textarea id="sql" rows="5" placeholder="输入 SQL 并点击执行">-- 支持：CREATE TABLE / INSERT / SELECT(WHERE) / DELETE
+-- 示例：
+CREATE TABLE student(id INT, name VARCHAR, age INT);
+INSERT INTO student(id, name, age) VALUES (1, 'Alice', 20);
+SELECT id, name FROM student WHERE age > 18;</textarea>
+  <br>
+  <button id="run" onclick="runSql()">执行</button>
+  <div id="result"></div>
+
+  <h2>数据表</h2>
+  <div id="tables"><em>加载中…</em></div>
 
   <h2>运行环境</h2>
   <table>
@@ -32,5 +51,69 @@
   </table>
 
   <footer>MiniDB · 中南大学《大型平台软件设计实习》课程设计</footer>
+
+  <script>
+    async function runSql() {
+      const sql = document.getElementById('sql').value;
+      const box = document.getElementById('result');
+      box.innerHTML = '<em>执行中…</em>';
+      try {
+        const resp = await fetch('/api/sql', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ sql: sql })
+        });
+        const data = await resp.json();
+        if (!data.ok) {
+          box.innerHTML = '<div class="err">' + escapeHtml(data.error || '执行失败') + '</div>';
+        } else if (data.kind === 'SELECT') {
+          box.innerHTML = renderTable(data.columns, data.rows);
+        } else {
+          box.innerHTML = '<div class="msg ok">' + escapeHtml(data.message || data.kind) + '</div>';
+        }
+        loadTables();
+      } catch (e) {
+        box.innerHTML = '<div class="err">请求失败：' + escapeHtml(String(e)) + '</div>';
+      }
+    }
+
+    function renderTable(columns, rows) {
+      if (!columns.length) return '<div class="msg">(empty result)</div>';
+      let html = '<table><tr>' + columns.map(c => '<th>' + escapeHtml(c) + '</th>').join('') + '</tr>';
+      for (const row of rows) {
+        html += '<tr>' + row.map(v => '<td>' + escapeHtml(v === null ? 'NULL' : String(v)) + '</td>').join('') + '</tr>';
+      }
+      return html + '</table>';
+    }
+
+    async function loadTables() {
+      const box = document.getElementById('tables');
+      try {
+        const resp = await fetch('/api/tables');
+        const data = await resp.json();
+        const ts = data.tables || [];
+        if (!ts.length) { box.innerHTML = '<em>(空数据库)</em>'; return; }
+        let html = '<table><tr><th>表名</th><th>列定义</th></tr>';
+        for (const t of ts) {
+          const cols = (t.columns || []).map(c => c.name + ' ' + c.type).join(', ');
+          html += '<tr><td>' + escapeHtml(t.name) + '</td><td>' + escapeHtml(cols) + '</td></tr>';
+        }
+        box.innerHTML = html + '</table>';
+      } catch (e) {
+        box.innerHTML = '<div class="err">加载表失败</div>';
+      }
+    }
+
+    function escapeHtml(s) {
+      return String(s).replace(/[&<>"']/g, m => ({
+        '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'
+      }[m]));
+    }
+
+    document.getElementById('sql').addEventListener('keydown', function (e) {
+      if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') runSql();
+    });
+    loadTables();
+  </script>
 </body>
 </html>

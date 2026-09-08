@@ -25,7 +25,23 @@
 from dataclasses import dataclass
 from typing import List, Optional
 
-from .ast_nodes import Program, Statement
+from .ast_nodes import (
+    BOOL,
+    NULL,
+    Program,
+    Statement,
+    CreateTableStmt,
+    InsertStmt,
+    SelectStmt,
+    DeleteStmt,
+    ColumnDef,
+    Star,
+    ColumnRef,
+    Literal,
+    NotExpr,
+    BinaryExpr,
+    Expression,
+)
 from .catalog import Catalog, ColumnInfo, TableInfo
 from .errors import (
     SQLError,
@@ -65,6 +81,9 @@ __all__ = [
     # Token / AST
     "Token", "TokenType", "KEYWORDS", "DATA_TYPE_KEYWORDS",
     "Program", "Statement",
+    "CreateTableStmt", "InsertStmt", "SelectStmt", "DeleteStmt", "ColumnDef",
+    "Star", "ColumnRef", "Literal", "NotExpr", "BinaryExpr", "Expression",
+    "BOOL", "NULL",
     # Catalog
     "Catalog", "ColumnInfo", "TableInfo",
     # 错误类型

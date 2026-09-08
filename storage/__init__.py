@@ -89,6 +89,10 @@ class Storage:
     def allocate_page(self) -> int:
         return self.fm.allocate_page()
 
+    def allocate_new_page(self) -> int:
+        """在文件末尾强制追加分配一个全新页(供需要连续区的上层使用)。"""
+        return self.fm.allocate_new_page()
+
     def release_page(self, page_id: int) -> None:
         self.fm.release_page(page_id)
 
@@ -108,6 +112,10 @@ class Storage:
 
     def flush_page(self, page_id: int) -> None:
         self.bp.flush_page(page_id)
+
+    def invalidate_page(self, page_id: int) -> None:
+        """把页从缓存移除(脏页先刷盘),供释放页前调用。"""
+        self.bp.invalidate_page(page_id)
 
     def flush_all(self) -> int:
         return self.bp.flush_all()

@@ -72,6 +72,10 @@ class Catalog:
     def find_table(self, name: str) -> Optional[TableInfo]:
         return self._tables.get(name.lower())
 
+    def drop_table(self, name: str) -> None:
+        """从目录中移除表(供引擎 DROP 使用);表不存在时忽略。"""
+        self._tables.pop(name.lower(), None)
+
     def find_column(self, table: str, col: str) -> Optional[ColumnInfo]:
         """按表名 + 列名查询列定义;表/列不存在返回 None。"""
         info = self.find_table(table)

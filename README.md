@@ -34,16 +34,22 @@ EchoSQL/
 │   ├── buffer.py        # 页缓存池：LRU/FIFO 替换、命中统计、替换日志（FR-2.2）
 │   ├── file_manager.py  # 磁盘文件管理：页分配/释放、页表持久化（FR-2.1/2.4）
 │   └── errors.py        # 存储错误类型（StorageError 及子类）
-├── engine/              # 数据库引擎：executor / storage_engine / catalog_manager
-├── cli/                 # 命令行接口（cmd/argparse）
-├── web/                 # Flask Web 控制台与 API
-├── tests/               # pytest 测试（test_env 环境冒烟；test_lexer/parser/semantic/planner/pipeline 编译器；test_storage 存储）
+├── engine/              # 数据库引擎（FR-3.x）：executor / storage_engine / catalog_manager
+│   ├── executor.py      # 执行引擎：CreateTable/Insert/SeqScan/Filter/Project/Delete 算子 + 表达式求值（FR-3.1/3.5）
+│   ├── storage_engine.py# 存储引擎：槽页 RowPage、行序列化、表扩展与回收（FR-3.2）
+│   ├── catalog_manager.py # 系统目录：元数据以特殊表持久化，本身经存储引擎读写（FR-3.3）
+│   └── errors.py        # 引擎运行时错误（EngineError / RowTooLarge / CatalogCorrupted）
+├── cli/                 # 命令行接口（cmd REPL，FR-3.4）：输入 SQL 返回结果/错误，-f 批处理
+├── web/                 # Flask Web 控制台与 API（/api/sql、/api/tables、/api/stats）
+├── tests/               # pytest 测试（test_lexer/parser/semantic/planner/pipeline 编译器；test_storage 存储；
+│   │                    #   test_engine 引擎端到端 TC-E2E-01~05；test_web_api Web API 集成）
 ├── utils/               # 工具函数
-├── data/                # 数据文件目录（页式存储落盘位置，minidb.db）
+├── data/                # 数据文件目录（页式存储落盘位置，minidb.db + 引擎系统目录）
 ├── grammar.md           # SQL 子集文法（必提交，P2 阶段细化定稿）
+├── demo.sql             # 端到端演示 SQL（测试文档 3.3 演示脚本）
 ├── requirements.txt
 ├── smoke_test.py        # 环境冒烟
-└── main.py              # 主程序入口（CLI，doctor 子命令为环境自检）
+└── main.py              # 主程序入口（CLI：REPL / -f 批处理 / doctor 环境自检）
 ```
 
 ## 开发环境搭建
@@ -74,8 +80,10 @@ pytest --cov=. --cov-report=term-missing   # 覆盖率统计
 ## 启动 Flask Web 控制台
 
 ```powershell
-python -m web.app               # http://127.0.0.1:5000
+python -m web.app               # http://127.0.0.1:5000（SQL 控制台）
 # 健康检查：GET http://127.0.0.1:5000/api/health
+# 执行 SQL：POST /api/sql  {"sql": "SELECT * FROM t;"}
+# 表结构：  GET /api/tables     运行统计：GET /api/stats
 ```
 
 ## 文档索引
@@ -129,11 +137,66 @@ for pid, chunk in zip(pids, split_into_pages(big_data)):
 重启持久化（FR-2.4）。存储错误统一为 `[StorageError] 原因` 格式（见
 `storage/errors.py`），非法操作不崩溃。
 
+## 数据库引擎（P4 交付）
+
+```python
+from engine import Database
+
+db = Database(data_dir="data")                 # 打开/创建数据库（自动加载系统目录）
+
+db.execute("CREATE TABLE student(id INT, name VARCHAR, age INT);")  # OK
+db.execute("INSERT INTO student VALUES(1,'Alice',20);")             # 1 row inserted
+db.execute("INSERT INTO student VALUES(2,'Bob',17);")
+db.execute("INSERT INTO student VALUES(3,'Carol',22);")
+
+result = db.execute("SELECT id,name FROM student WHERE age > 18;")  # 条件查询
+print(result.format())        # SELECT 输出对齐表格 / 其余输出 message
+# id  | name
+# ----+-------
+# 1   | Alice
+# 3   | Carol
+
+db.execute("DELETE FROM student WHERE id = 2;")                     # 1 row deleted
+db.execute_script("...;...;")     # 按 ';' 切分逐条执行，返回结果列表
+db.tables() / db.table_infos()    # 目录查询（FR-3.3）
+db.stats()                        # 缓存命中率等运行统计（贯通 FR-2.2）
+db.drop_table("student")          # 删表并回收全部数据页（FR-3.2 表的回收）
+db.close()                        # 关闭前持久化目录 + Checkpoint 刷盘
+```
+
+命令行（FR-3.4 / SRS 5.1 交互）：
+
+```powershell
+python main.py                    # 交互式 REPL：MiniDB> 输入 SQL，quit 退出
+python main.py -f demo.sql        # 批处理执行 SQL 脚本
+python main.py --data-dir tmp --policy FIFO   # 指定数据目录 / 替换策略
+```
+
+Web 控制台（SRS 2.3「也可通过 API 调用」）：`python -m web.app` 后打开
+http://127.0.0.1:5000，可直接在页面上执行 SQL 并查看结果表格。
+
+引擎内部结构（三模块 + 门面）：
+- `executor.py` 执行引擎（FR-3.1）：CreateTable / Insert / SeqScan / Filter /
+  Project / Delete 算子；表达式求值遵循 SQL 三值逻辑（NULL 为 unknown），
+  与编译期常量折叠（planner）语义一致；
+- `storage_engine.py` 存储引擎（FR-3.2）：`RowPage` 槽页（页头 + 槽数组 +
+  行数据 + 空闲区，SRS 第 6 章）、`encode_row/decode_row` 行序列化
+  （INT/FLOAT/VARCHAR/NULL 自描述编码）、表页集合管理（插入自动扩展新页、
+  删除标记 + 整页回收、释放全部页）；
+- `catalog_manager.py` 系统目录（FR-3.3）：元数据（表名/列名/列类型/页集合）
+  以 JSON blob 持久化为「特殊表」，占用文件开头固定目录区（页 1~16，
+  本身经存储引擎读写），重启后表结构与数据页映射不丢失；
+- `errors.py` 引擎运行时错误（`[EngineError, 原因]`），非法输入不崩溃。
+
+引擎需求覆盖：四类核心 SQL 完整执行（FR-3.5）、持久化重启可查询（TC-E2E-05）、
+条件查询准确性（TC-E2E-03）、删除后不可见与整页回收（TC-E2E-04）、
+建表重复报错（TC-E2E-01）、大量数据插入跨页存储（TC-E2E-02，见 `tests/test_engine.py`）。
+
 ## 当前进度
 
 - [x] P0 环境准备：venv + 依赖 + 项目骨架 + Flask 开发环境 + 环境冒烟测试
 - [x] P1 文法与项目结构（grammar.md 细化定稿 + 目录结构完善）
 - [x] P2 SQL 编译器（Lexer / Parser / Semantic / Planner / Catalog + 单测）
 - [x] P3 存储系统（页式存储 / 缓存与替换 LRU+FIFO / 持久化 + 单测）
-- [ ] P4 数据库引擎（执行引擎 / 存储引擎 / Catalog / CLI + Web 集成）
+- [x] P4 数据库引擎（执行引擎 / 存储引擎 / Catalog / CLI + Web 集成）
 - [ ] P5 测试与优化（覆盖率 / 边界 / 规则优化）

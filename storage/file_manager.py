@@ -133,7 +133,7 @@ class FileManager:
     def allocate_page(self) -> int:
         """分配一个新页,返回唯一页编号。
 
-        优先复用空闲页(TC-ST-06),否则扩展文件末尾分配新页;
+        优先复用空闲页(TC-ST-06),否则扩展文件末尾分配新页(allocate_new_page);
         分配后立即写回页表,保证持久化。
         """
         reused = self._find_first_free()
@@ -142,17 +142,28 @@ class FileManager:
             self.free_count -= 1
             page_id = reused
         else:
-            page_id = self.page_count
-            if page_id >= (PAGE_SIZE - PAGE_HEADER_SIZE) * 8:
-                raise PageTableFull(
-                    "page table full, cannot allocate page %d" % page_id
-                )
-            self.page_count += 1
-            self._bitmap = bytearray(self._bitmap_len())
-            # 在文件末尾预留一页全零空间,保证后续可读
-            self._file.seek(page_id * PAGE_SIZE)
-            self._file.write(b"\x00" * PAGE_SIZE)
-            self._file.flush()
+            page_id = self.allocate_new_page()
+            return page_id
+        self._store_meta()
+        return page_id
+
+    def allocate_new_page(self) -> int:
+        """在文件末尾强制追加分配一个全新页(不查空闲位图)。
+
+        供需要「连续区」的上层使用(如引擎的系统目录区):
+        追加的页号恒等于当前 page_count,保证按序分配时页号连续。
+        """
+        page_id = self.page_count
+        if page_id >= (PAGE_SIZE - PAGE_HEADER_SIZE) * 8:
+            raise PageTableFull(
+                "page table full, cannot allocate page %d" % page_id
+            )
+        self.page_count += 1
+        self._bitmap = bytearray(self._bitmap_len())
+        # 在文件末尾预留一页全零空间,保证后续可读
+        self._file.seek(page_id * PAGE_SIZE)
+        self._file.write(b"\x00" * PAGE_SIZE)
+        self._file.flush()
         self._store_meta()
         return page_id
 
