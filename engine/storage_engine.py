@@ -208,6 +208,12 @@ def encode_row(values: List[object]) -> bytes:
             buf.append(_TAG_INT)
             buf += struct.pack(">i", 1 if value else 0)
         elif isinstance(value, int):
+            # 物理存储为 32 位有符号整数(grammar.md §4.1):超范围拒绝而非
+            # struct.error 崩溃,统一转为 EngineError(RowTooLarge)便于上层捕获
+            if not (-(2 ** 31) <= value <= 2 ** 31 - 1):
+                raise RowTooLarge(
+                    "INT value %d exceeds 32-bit range" % value
+                )
             buf.append(_TAG_INT)
             buf += struct.pack(">i", value)
         elif isinstance(value, float):

@@ -9,6 +9,14 @@
     补充    存储引擎单元（槽页 / 行序列化 / 表扩展与回收）、
             表达式求值（NULL 三值逻辑）、目录管理、脚本执行、错误处理。
 """
+import os
+import sys
+
+# 直接运行(python tests/test_engine.py)时也能导入项目根包
+_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+if _ROOT not in sys.path:
+    sys.path.insert(0, _ROOT)
+
 import pytest
 
 from engine import (
@@ -547,3 +555,27 @@ def test_e2e_string_escape_and_chinese(db):
     rows = db.execute("SELECT name FROM t;").rows
     assert rows[0] == ["Tom's book"]
     assert rows[1] == ["中文数据"]
+
+
+# ======================================================================
+# 统一启动方法（P5）：开发者可直接运行本测试模块
+#     python tests/test_engine.py
+#     或编程调用 run_tests()（返回 pytest 退出码，0 = 全部通过）
+# ======================================================================
+
+
+def run_tests(verbose=True, extra_args=None):
+    """统一启动方法：以 pytest 运行本测试模块全部用例。
+
+    用法:
+        python tests/test_engine.py           # 命令行直接运行
+        from runner import run_module         # 或编程调用(所有模块签名一致)
+        run_module("tests/test_engine.py")
+    """
+    from runner import run_module
+    return run_module(__file__, verbose=verbose, extra_args=extra_args)
+
+
+if __name__ == "__main__":
+    import sys
+    sys.exit(run_tests())

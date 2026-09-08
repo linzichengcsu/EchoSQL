@@ -42,7 +42,9 @@ EchoSQL/
 ├── cli/                 # 命令行接口（cmd REPL，FR-3.4）：输入 SQL 返回结果/错误，-f 批处理
 ├── web/                 # Flask Web 控制台与 API（/api/sql、/api/tables、/api/stats）
 ├── tests/               # pytest 测试（test_lexer/parser/semantic/planner/pipeline 编译器；test_storage 存储；
-│   │                    #   test_engine 引擎端到端 TC-E2E-01~05；test_web_api Web API 集成）
+│   │                    #   test_engine 引擎端到端 TC-E2E-01~05；test_web_api Web API 集成；
+│   │                    #   P5 新增 test_boundary 边界 / test_optimizer 规则优化 / test_cli 命令行；
+│   │                    #   runner.py + run_all.py 统一启动方法，每个 test_*.py 均提供 run_tests()）
 ├── utils/               # 工具函数
 ├── data/                # 数据文件目录（页式存储落盘位置，minidb.db + 引擎系统目录）
 ├── grammar.md           # SQL 子集文法（必提交，P2 阶段细化定稿）
@@ -75,6 +77,24 @@ python main.py doctor           # 打印各依赖版本
 ```powershell
 pytest -v                       # 全部测试
 pytest --cov=. --cov-report=term-missing   # 覆盖率统计
+```
+
+P5 起，每个测试模块（tests/test_*.py）都提供**同名统一启动方法** `run_tests()`，
+开发者无需了解 pytest 细节即可按同一方式运行任意测试类（模块）：
+
+```powershell
+python tests/test_engine.py     # 直接运行单个测试模块（任意 test_*.py）
+python tests/run_all.py         # 一键运行全部测试（等价 pytest tests，参数透传）
+python tests/run_all.py --cov=. --cov-report=term-missing   # 总入口带覆盖率
+```
+
+编程方式调用（每个模块的 run_tests 返回 pytest 退出码，0 = 全部通过）：
+
+```python
+import sys
+sys.path.insert(0, "tests")
+import test_optimizer as m
+sys.exit(m.run_tests(verbose=False))          # 运行 test_optimizer 全部用例
 ```
 
 ## 启动 Flask Web 控制台
@@ -192,6 +212,46 @@ http://127.0.0.1:5000，可直接在页面上执行 SQL 并查看结果表格。
 条件查询准确性（TC-E2E-03）、删除后不可见与整页回收（TC-E2E-04）、
 建表重复报错（TC-E2E-01）、大量数据插入跨页存储（TC-E2E-02，见 `tests/test_engine.py`）。
 
+## P5 测试与优化（交付）
+
+P5 阶段聚焦「系统测试、边界测试、优化、调试」，交付如下。
+
+### 1. 测试类扩展：每个测试类都有统一启动方法 `run_tests()`
+
+| 测试模块（tests/） | 类型 | 说明 |
+| --- | --- | --- |
+| test_lexer / test_parser / test_semantic / test_planner / test_pipeline | 编译器单测 | P2 既有 |
+| test_storage | 存储单测 | P3 既有 |
+| test_engine / test_web_api / test_env | 引擎 E2E / Web API / 环境 | P4 既有 |
+| **test_boundary**（P5 新增） | 边界 / 系统测试 | 超长输入、字符串/数字/注释边界、深度嵌套括号、缓存容量/策略参数、页大小与行大小上限、INT 32 位范围、跨页大量行、非 JSON 请求、INT 溢出 400 等 |
+| **test_optimizer**（P5 新增） | 规则优化测试 | 常量折叠全规则（算术/比较/逻辑/NOT/NULL 三值逻辑全值表）、优化幂等性、无谓词计划不变、**优化不改变查询语义**（引擎级保真） |
+| **test_cli**（P5 新增） | CLI 系统测试 | MiniDBShell 输出（表格/message/错误打印）、tables/stats/quit、run_sql_file 批处理成功/失败、cli.main 参数解析 |
+
+统一启动方法约定（实现见 `tests/runner.py`，总入口 `tests/run_all.py`）：
+- 每个 `tests/test_*.py` 均定义 **同名** `run_tests(verbose=True, extra_args=None) -> int`；
+- 命令行直接运行：`python tests/test_xxx.py`；一键全部：`python tests/run_all.py`；
+- 编程调用：`from runner import run_module; run_module("tests/test_xxx.py")`；
+- 返回 pytest 退出码（0 = 全部通过），可接入脚本 / CI。
+
+### 2. 测试与覆盖率
+
+- 用例数由 P4 的 **145 增至 222**，`pytest tests` 全绿；
+- 覆盖率：`pytest tests --cov=. --cov-report=term-missing`（核心模块均 >90%）；
+- 补齐缺口：`cli` 模块由 0% 覆盖到全绿（test_cli.py）。
+
+### 3. 缺陷修复记录（调试）
+
+| 编号 | 缺陷 | 修复 | 验证 |
+| --- | --- | --- | --- |
+| #1 | INT 字面量超出 32 位范围时 `struct.pack` 抛未定义异常 `struct.error`（CLI/Web 层无法捕获，Web 直接 500） | `encode_row` 增加 32 位范围检查，改抛 `RowTooLarge`（EngineError 子类，`[RowTooLarge, ...]` 格式） | test_boundary `test_int_32bit_range_boundary` / `test_api_int_overflow_returns_400`；Web 返回 400 而非 500 |
+| #2 | grammar.md §1.2.5 承诺浮点 `1.`、`.5` 合法，词法分析器实际拒绝 | lexer `_lex_number` 支持三种浮点形式（`3.14` / `1.` / `.5`），`1.2.3`、`.5.6`、`12abc` 等仍按非法数字报错 | test_boundary `test_lexer_float_forms_from_grammar` / `test_lexer_float_illegal_still_rejected` |
+
+### 4. 已知限制（文法内不承诺，不视为缺陷）
+
+- 无一元负号：`-1` 不能作为字面量（literal 文法仅 INT_CONST / FLOAT_CONST / STRING / TRUE / FALSE / NULL）；
+- 不支持科学计数法（`1e3` 报 LexError）；
+- 孤立分号 `;` 在语法层拒绝（`Database.execute` 层宽容处理）。
+
 ## 当前进度
 
 - [x] P0 环境准备：venv + 依赖 + 项目骨架 + Flask 开发环境 + 环境冒烟测试
@@ -199,4 +259,4 @@ http://127.0.0.1:5000，可直接在页面上执行 SQL 并查看结果表格。
 - [x] P2 SQL 编译器（Lexer / Parser / Semantic / Planner / Catalog + 单测）
 - [x] P3 存储系统（页式存储 / 缓存与替换 LRU+FIFO / 持久化 + 单测）
 - [x] P4 数据库引擎（执行引擎 / 存储引擎 / Catalog / CLI + Web 集成）
-- [ ] P5 测试与优化（覆盖率 / 边界 / 规则优化）
+- [x] P5 测试与优化（新增边界/优化/CLI 测试 + 统一启动方法 + 缺陷修复，详见上节）

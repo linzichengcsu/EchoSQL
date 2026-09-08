@@ -1,4 +1,12 @@
 """语法分析器单元测试(对应测试文档 3.1.2 TC-P-01 ~ TC-P-05)。"""
+import os
+import sys
+
+# 直接运行(python tests/test_parser.py)时也能导入项目根包
+_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+if _ROOT not in sys.path:
+    sys.path.insert(0, _ROOT)
+
 import pytest
 
 from sql_compiler import ParseError, parse, lex
@@ -149,3 +157,27 @@ def test_keyword_case_insensitive_in_parser():
     ast = parse(lex("create table t (a int); select * from t;"))
     assert isinstance(ast.statements[0], CreateTableStmt)
     assert ast.statements[0].table == "t"
+
+
+# ======================================================================
+# 统一启动方法（P5）：开发者可直接运行本测试模块
+#     python tests/test_parser.py
+#     或编程调用 run_tests()（返回 pytest 退出码，0 = 全部通过）
+# ======================================================================
+
+
+def run_tests(verbose=True, extra_args=None):
+    """统一启动方法：以 pytest 运行本测试模块全部用例。
+
+    用法:
+        python tests/test_parser.py           # 命令行直接运行
+        from runner import run_module         # 或编程调用(所有模块签名一致)
+        run_module("tests/test_parser.py")
+    """
+    from runner import run_module
+    return run_module(__file__, verbose=verbose, extra_args=extra_args)
+
+
+if __name__ == "__main__":
+    import sys
+    sys.exit(run_tests())

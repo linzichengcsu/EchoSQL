@@ -3,6 +3,14 @@
 验证 Flask 层 /api/sql、/api/tables、/api/health 与引擎贯通，
 以及错误 SQL 返回结构化错误而非崩溃。
 """
+import os
+import sys
+
+# 直接运行(python tests/test_web_api.py)时也能导入项目根包
+_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+if _ROOT not in sys.path:
+    sys.path.insert(0, _ROOT)
+
 import pytest
 
 import web.app as web_app
@@ -65,3 +73,27 @@ def test_empty_sql_ok(client):
     resp = client.post("/api/sql", json={"sql": "   "})
     data = resp.get_json()
     assert data["ok"] is True and data["kind"] == "EMPTY"
+
+
+# ======================================================================
+# 统一启动方法（P5）：开发者可直接运行本测试模块
+#     python tests/test_web_api.py
+#     或编程调用 run_tests()（返回 pytest 退出码，0 = 全部通过）
+# ======================================================================
+
+
+def run_tests(verbose=True, extra_args=None):
+    """统一启动方法：以 pytest 运行本测试模块全部用例。
+
+    用法:
+        python tests/test_web_api.py          # 命令行直接运行
+        from runner import run_module         # 或编程调用(所有模块签名一致)
+        run_module("tests/test_web_api.py")
+    """
+    from runner import run_module
+    return run_module(__file__, verbose=verbose, extra_args=extra_args)
+
+
+if __name__ == "__main__":
+    import sys
+    sys.exit(run_tests())

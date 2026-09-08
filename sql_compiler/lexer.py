@@ -114,18 +114,23 @@ class Lexer:
         return self._make(TokenType.IDENTIFIER, lexeme, line, col)
 
     def _lex_number(self, line: int, col: int) -> Token:
-        """数字常量:整数或浮点;检测非法数字(12abc / 1.2.3)。"""
+        """数字常量:整数或浮点;检测非法数字(12abc / 1.2.3)。
+
+        浮点支持三种文法形式(grammar.md §1.2.5):`3.14`、`1.`、`.5`
+        (小数点两侧至少一侧有数字);`1.2.3`、`.5.6` 等重复小数点仍报非法。
+        """
         start = self.pos
+        is_float = self._peek() == "."  # `.5` 形式:以小数点开头
+        if is_float:
+            self._advance()  # 消费 '.'
         while self.pos < self.length and self._peek().isdigit():
             self._advance()
-        is_float = False
-        if self._peek() == ".":
-            # 小数点后必须是数字才算浮点;否则 '.' 留给独立 DOT
-            if self._peek(1).isdigit():
-                is_float = True
-                self._advance()  # '.'
-                while self.pos < self.length and self._peek().isdigit():
-                    self._advance()
+        if not is_float and self._peek() == ".":
+            # `1.5` / `1.` 形式:小数点后至少一侧有数字即浮点
+            is_float = True
+            self._advance()  # 消费 '.'
+            while self.pos < self.length and self._peek().isdigit():
+                self._advance()
         lexeme = self.sql[start:self.pos]
 
         # 非法数字:数字后紧跟字母,或浮点后再次出现 '.数字'(如 1.2.3)
@@ -187,7 +192,7 @@ class Lexer:
             ch = self._peek()
             if ch.isalpha() or ch == "_":
                 tokens.append(self._lex_identifier(line, col))
-            elif ch.isdigit():
+            elif ch.isdigit() or (ch == "." and self._peek(1).isdigit()):
                 tokens.append(self._lex_number(line, col))
             elif ch == "'":
                 tokens.append(self._lex_string(line, col))
