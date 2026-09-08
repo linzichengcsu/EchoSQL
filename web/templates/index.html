@@ -1,0 +1,36 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <title>MiniDB Web Console</title>
+  <style>
+    body { font-family: "Segoe UI", "Microsoft YaHei", sans-serif; margin: 2rem auto; max-width: 720px;
+           color: #222; background: #f7f8fa; }
+    h1 { border-bottom: 2px solid #2b6cb0; padding-bottom: .4rem; }
+    code { background: #eef; padding: .1rem .4rem; border-radius: 4px; }
+    table { border-collapse: collapse; margin-top: 1rem; width: 100%; }
+    th, td { border: 1px solid #ccc; padding: .45rem .7rem; text-align: left; }
+    th { background: #e8eef7; }
+    .ok { color: #1a7f37; font-weight: bold; }
+    footer { margin-top: 2rem; color: #888; font-size: .85rem; }
+  </style>
+</head>
+<body>
+  <h1>MiniDB Web Console</h1>
+  <p>数据库管理系统课程设计 · Flask 开发环境骨架
+     （SQL 编译器 / 存储系统 / 数据库引擎 将在后续阶段接入）</p>
+
+  <p>健康检查：<span class="ok">/api/health</span></p>
+
+  <h2>运行环境</h2>
+  <table>
+    <tr><th>项目</th><th>值</th></tr>
+    <tr><td>Python</td><td><code>{{ env.python }}</code></td></tr>
+    <tr><td>平台</td><td><code>{{ env.platform }}</code></td></tr>
+    <tr><td>Flask</td><td><code>{{ env.flask }}</code></td></tr>
+    <tr><td>pytest</td><td><code>{{ env.pytest }}</code></td></tr>
+  </table>
+
+  <footer>MiniDB · 中南大学《大型平台软件设计实习》课程设计</footer>
+</body>
+</html>

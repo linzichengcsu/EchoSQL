@@ -1,0 +1,13 @@
+# requirements.txt
+# MiniDB 依赖清单 —— 依据《推荐技术栈安装指导文档》第 4 章
+# 核心功能仅需 Python 标准库；以下为开发、测试与 Web 接口依赖。
+
+# ---- 测试（指导文档推荐）----
+pytest>=7.0
+pytest-cov>=4.0
+
+# ---- 可视化（可选：AST / Logical Plan 树形可视化）----
+graphviz>=0.20
+
+# ---- Web 控制接口（Flask，SRS 2.3 "也可通过 API 调用"）----
+flask>=3.0
