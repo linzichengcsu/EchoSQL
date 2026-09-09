@@ -127,7 +127,8 @@ def test_catalog_query_interfaces(catalog):
     assert [c.name for c in info.columns] == ["a", "b", "c"]
     assert catalog.get_type("t", "b") == "VARCHAR"
     assert catalog.find_column("t", "a").data_type == "INT"
-    assert catalog.find_table("T") is not None  # 大小写不敏感
+    assert catalog.find_table("t") is not None  # 精确匹配可查
+    assert catalog.find_table("T") is None  # 大小写敏感:不同大小写视为不同名字
 
 
 def test_error_positions(catalog):

@@ -150,10 +150,10 @@ class Executor:
     def _exec_insert(self, plan: InsertPlan) -> ExecutionResult:
         table = self._catalog.table_storage(plan.table)
         col_defs = table.columns
-        col_index = {c.name.lower(): i for i, c in enumerate(col_defs)}
+        col_index = {c.name: i for i, c in enumerate(col_defs)}
         full = [None] * len(col_defs)
         for col_name, lit in zip(plan.columns, plan.values):
-            key = col_name.lower()
+            key = col_name
             if key not in col_index:
                 raise EngineError("unknown column %r in table %r" % (col_name, table.name))
             full[col_index[key]] = lit.value
@@ -184,7 +184,7 @@ class Executor:
 
     def _exec_scan(self, plan: SeqScanPlan) -> ExecutionResult:
         table = self._catalog.table_storage(plan.table)
-        rows = [[row.get(c.name.lower()) for c in table.columns]
+        rows = [[row.get(c.name) for c in table.columns]
                 for _, row in self._scan_table(plan.table)]
         return ExecutionResult(
             "SELECT", columns=[c.name for c in table.columns], rows=rows,
@@ -194,7 +194,7 @@ class Executor:
         # 语法上顶层必为 Project；此处防御 Filter 直出全列
         child = self._scan_plan(plan.child)
         table = self._catalog.table_storage(self._scan_table_name(plan.child))
-        rows = [[r.get(c.name.lower()) for c in table.columns]
+        rows = [[r.get(c.name) for c in table.columns]
                 for rid, r in child if eval_expr(plan.predicate, r, self._catalog) is True]
         return ExecutionResult(
             "SELECT", columns=[c.name for c in table.columns], rows=rows,
@@ -203,7 +203,7 @@ class Executor:
     def _exec_select(self, plan: ProjectPlan) -> ExecutionResult:
         rows = self._scan_plan(plan)
         col_names = plan.columns
-        out_rows = [[row.get(c.lower()) for c in col_names] for _, row in rows]
+        out_rows = [[row.get(c) for c in col_names] for _, row in rows]
         return ExecutionResult("SELECT", columns=col_names, rows=out_rows)
 
     def _scan_plan(self, plan: Plan) -> List[Tuple[Any, Dict[str, Any]]]:
@@ -225,7 +225,7 @@ class Executor:
         table = self._catalog.table_storage(name)
         out = []
         for page_id, slot, values in table.scan():
-            row = {c.name.lower(): v for c, v in zip(table.columns, values)}
+            row = {c.name: v for c, v in zip(table.columns, values)}
             out.append(((page_id, slot), row))
         return out
 
@@ -258,7 +258,7 @@ class Executor:
                 if raw is None:
                     continue
                 values = decode_row(raw)
-                row = {c.name.lower(): v for c, v in zip(col_defs, values)}
+                row = {c.name: v for c, v in zip(col_defs, values)}
                 if plan.predicate is not None:
                     keep = eval_expr(plan.predicate, row, self._catalog)
                     if keep is not True:
@@ -296,7 +296,7 @@ def eval_expr(expr: Expression, row: Dict[str, Any], catalog=None) -> Any:
     if isinstance(expr, Literal):
         return expr.value
     if isinstance(expr, ColumnRef):
-        return row.get(expr.name.lower())
+        return row.get(expr.name)
     if isinstance(expr, NotExpr):
         value = eval_expr(expr.operand, row, catalog)
         return None if value is None else (not value)

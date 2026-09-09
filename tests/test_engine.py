@@ -440,12 +440,22 @@ def test_execute_multi_statements_returns_last(db):
     assert result.rows == [[7]]
 
 
-def test_case_insensitive_names(db):
+def test_case_sensitive_names(db):
+    """表名/列名大小写敏感:不同大小写视为不同名字(grammar.md §1.2.4)。"""
     db.execute("CREATE TABLE Student(Id INT, Name VARCHAR);")
-    db.execute("INSERT INTO STUDENT(ID, NAME) VALUES(1, 'Alice');")
-    result = db.execute("select ID, NAME from student;")
+    # 大小写不一致的表引用被语义分析拒绝(UnknownTable)
+    with pytest.raises(SQLError):
+        db.execute("INSERT INTO STUDENT(ID, NAME) VALUES(1, 'Alice');")
+    with pytest.raises(SQLError):
+        db.execute("SELECT * FROM student;")
+    # 精确大小写引用正常
+    db.execute("INSERT INTO Student(Id, Name) VALUES(1, 'Alice');")
+    result = db.execute("SELECT Id, Name FROM Student;")
     assert result.rows == [[1, "Alice"]]
     assert "Student" in db.tables()
+    # 仅大小写不同的表名可以同时存在
+    db.execute("CREATE TABLE student(x INT);")
+    assert sorted(db.tables()) == ["Student", "student"]
 
 
 def test_insert_null_value(db):

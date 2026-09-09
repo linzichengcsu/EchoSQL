@@ -9,7 +9,7 @@
     get_type(table, col) -> str | None         获取列类型
 
 说明:
-- 表名 / 列名大小写不敏感,统一转小写存储与查找;
+- 表名 / 列名大小写敏感:按原拼写精确存储与匹配(关键字仍大小写不敏感,见 grammar.md);
 - 本 Catalog 为编译期(内存)目录,运行时持久化目录见 engine.catalog_manager(P4);
 - 未注册表返回 None,由 semantic 层抛出 UnknownTable。
 """
@@ -40,10 +40,10 @@ class TableInfo:
 
     def __post_init__(self):
         for i, col in enumerate(self.columns):
-            self._index[col.name.lower()] = i
+            self._index[col.name] = i
 
     def find_column(self, col: str) -> Optional[ColumnInfo]:
-        idx = self._index.get(col.lower())
+        idx = self._index.get(col)
         return self.columns[idx] if idx is not None else None
 
     def column_names(self) -> List[str]:
@@ -59,8 +59,8 @@ class Catalog:
 
     # ---------- 注册 / 查询 ----------
     def create_table(self, name: str, columns: List[ColumnInfo]) -> TableInfo:
-        """注册新表;若表已存在抛出 TableAlreadyExists(TC-S-05)。"""
-        key = name.lower()
+        """注册新表;若同名(精确匹配)表已存在抛出 TableAlreadyExists(TC-S-05)。"""
+        key = name
         if key in self._tables:
             raise TableAlreadyExists(
                 0, 0, "table %r already exists" % name
@@ -70,11 +70,11 @@ class Catalog:
         return info
 
     def find_table(self, name: str) -> Optional[TableInfo]:
-        return self._tables.get(name.lower())
+        return self._tables.get(name)
 
     def drop_table(self, name: str) -> None:
         """从目录中移除表(供引擎 DROP 使用);表不存在时忽略。"""
-        self._tables.pop(name.lower(), None)
+        self._tables.pop(name, None)
 
     def find_column(self, table: str, col: str) -> Optional[ColumnInfo]:
         """按表名 + 列名查询列定义;表/列不存在返回 None。"""
@@ -89,7 +89,7 @@ class Catalog:
         return col_info.data_type if col_info else None
 
     def has_table(self, name: str) -> bool:
-        return name.lower() in self._tables
+        return name in self._tables
 
     def tables(self) -> List[TableInfo]:
         """按注册顺序返回全部表(用于测试与调试)。"""

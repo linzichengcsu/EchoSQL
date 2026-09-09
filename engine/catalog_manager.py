@@ -47,7 +47,7 @@ class CatalogManager:
         self._storage = storage
         #: 编译期目录视图(sql_compiler.Catalog),供 analyze / plan 使用
         self._catalog = Catalog()
-        #: 表名(小写) -> TableStorage
+        #: 表名(原始拼写,大小写敏感) -> TableStorage
         self._tables: Dict[str, TableStorage] = {}
 
     # ------------------------------------------------------------------
@@ -78,7 +78,7 @@ class CatalogManager:
             raise CatalogCorrupted("catalog blob has invalid structure")
         for entry in data["tables"]:
             ts = TableStorage.from_json(self._storage, entry)
-            key = ts.name.lower()
+            key = ts.name
             self._tables[key] = ts
             self._catalog.create_table(
                 ts.name,
@@ -114,16 +114,16 @@ class CatalogManager:
         return self._catalog
 
     def find_table(self, name: str) -> Optional[TableStorage]:
-        return self._tables.get(name.lower())
+        return self._tables.get(name)
 
     def table_storage(self, name: str) -> TableStorage:
-        ts = self._tables.get(name.lower())
+        ts = self._tables.get(name)
         if ts is None:
             raise CatalogCorrupted("table %r is not registered in catalog" % name)
         return ts
 
     def has_table(self, name: str) -> bool:
-        return name.lower() in self._tables
+        return name in self._tables
 
     def table_names(self) -> List[str]:
         return [ts.name for ts in self._tables.values()]
@@ -140,7 +140,7 @@ class CatalogManager:
         """
         if not self._catalog.has_table(name):
             self._catalog.create_table(name, columns)
-        key = name.lower()
+        key = name
         ts = self._tables.get(key)
         if ts is None:
             ts = TableStorage(self._storage, name, columns)
@@ -150,7 +150,7 @@ class CatalogManager:
 
     def drop_table(self, name: str) -> int:
         """删表:释放全部数据页(表的回收,FR-3.2)+ 移除元数据 + 持久化。"""
-        key = name.lower()
+        key = name
         ts = self._tables.pop(key, None)
         if ts is None:
             return 0

@@ -565,8 +565,8 @@ def _build():
            {"kind": "SELECT", "columns": ["id"], "rows": [[3]]},
            setup=NUM_SEED),
         TC("BB-C044", "查询", "grammar.md §1.1", "关键字任意大小写等价",
-           "SeLeCt Id FrOm NuM wHeRe Id = 3;",
-           {"kind": "SELECT", "columns": ["Id"], "rows": [[3]]},
+           "SeLeCt id FrOm num wHeRe id = 3;",
+           {"kind": "SELECT", "columns": ["id"], "rows": [[3]]},
            setup=NUM_SEED),
         TC("BB-C045", "查询", "grammar.md §7（未实现）", "投影表达式不受文法支持（SELECT 列表仅列名）",
            "SELECT id + 1 FROM num;",
@@ -744,7 +744,7 @@ def _build():
     # F. 名称 / 大小写（grammar.md §1.1 / §1.2.4）
     # ==================================================================
     F = [
-        TC("BB-F001", "名称大小写", "grammar.md §1.2.4", "表名/列名大小写不敏感（统一小写解析）",
+        TC("BB-F001", "名称大小写", "grammar.md §1.2.4", "表名/列名大小写敏感（原拼写精确匹配）",
            "CREATE TABLE Student(Id INT, Name VARCHAR);",
            {"kind": "CREATE", "message_has": "OK"},
            tables_after_extra=["Student"]),
@@ -777,9 +777,9 @@ def _build():
            "INSERT INTO t(select) VALUES(1);",
            {"error": "ParseError"},
            setup=["CREATE TABLE t(a INT);"]),
-        TC("BB-F008", "名称大小写", "FR-3.1", "SELECT 列名按书写大小写返回",
-           "SELECT ID FROM num WHERE ID = 3;",
-           {"kind": "SELECT", "columns": ["ID"], "rows": [[3]]},
+        TC("BB-F008", "名称大小写", "grammar.md §1.2.4", "列名大小写敏感：引用拼写与建表不同报 UnknownColumn",
+           "SELECT ID FROM num;",
+           {"error": "UnknownColumn"},
            setup=NUM_SEED),
         TC("BB-F009", "名称大小写", "FR-3.3", "SELECT * 列头保留建表时大小写",
            "SELECT * FROM Student;",
@@ -799,12 +799,10 @@ def _build():
            setup=["CREATE TABLE t(name VARCHAR);",
                   "INSERT INTO t VALUES('Alice');"],
            boundary=True),
-        TC("BB-F012", "名称大小写", "grammar.md §1.2.4", "大写插入与混合大小写查询回读一致",
-           "INSERT INTO STUDENT(ID, NAME) VALUES(1, 'Alice');",
-           {"kind": "INSERT", "rows_affected": 1},
-           setup=["CREATE TABLE Student(Id INT, Name VARCHAR);"],
-           then_sql="select ID, NAME from student;",
-           then_rows=[[1, "Alice"]]),
+        TC("BB-F012", "名称大小写", "grammar.md §1.2.4", "表名大小写敏感：建表 Student 后小写引用报 UnknownTable",
+           "INSERT INTO student(ID, NAME) VALUES(1, 'Alice');",
+           {"error": "UnknownTable"},
+           setup=["CREATE TABLE Student(Id INT, Name VARCHAR);"]),
     ]
 
     # ==================================================================

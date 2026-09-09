@@ -230,18 +230,18 @@
 | BB-E010 | engine | NULL | - | NULL 参与算术比较结果为 unknown | 三值逻辑 算术 |
 | BB-E011 | engine | NULL | - | 投影中 NULL 值原样展示 | FR-3.1 |
 | BB-E012 | engine | NULL | - | NULL 行在数值过滤中被排除、非 NULL 行保留 | grammar.md §4.1 |
-| BB-F001 | engine | 名称大小写 | - | 表名/列名大小写不敏感（统一小写解析） | grammar.md §1.2.4 |
+| BB-F001 | engine | 名称大小写 | - | 表名/列名大小写敏感（原拼写精确匹配） | grammar.md §1.2.4 |
 | BB-F002 | engine | 名称大小写 | - | 关键字全小写查询可用 | grammar.md §1.1 |
 | BB-F003 | engine | 名称大小写 | - | 关键字任意混写大小写可用 | grammar.md §1.1 |
 | BB-F004 | engine | 名称大小写 | - | 含下划线与数字的标识符可用 | grammar.md §1.2.4 |
 | BB-F005 | engine | 名称大小写 | - | 下划线开头标识符可用 | grammar.md §1.2.4 |
 | BB-F006 | engine | 名称大小写 | 是 | 60 字符长表名/列名可建可查 | P5 边界 |
 | BB-F007 | engine | 名称大小写 | - | 保留字作 INSERT 列清单项被语法拒绝 | grammar.md §2 |
-| BB-F008 | engine | 名称大小写 | - | SELECT 列名按书写大小写返回 | FR-3.1 |
+| BB-F008 | engine | 名称大小写 | - | 列名大小写敏感：引用拼写与建表不同报 UnknownColumn | grammar.md §1.2.4 |
 | BB-F009 | engine | 名称大小写 | - | SELECT * 列头保留建表时大小写 | FR-3.3 |
 | BB-F010 | engine | 名称大小写 | 是 | 非 ASCII（中文）标识符当前实现允许建表并查询 | grammar.md §1.2.4（实现放宽） |
 | BB-F011 | engine | 名称大小写 | 是 | 字符串比较区分大小写（'alice' ≠ 'Alice'） | grammar.md §1.2.4 |
-| BB-F012 | engine | 名称大小写 | - | 大写插入与混合大小写查询回读一致 | grammar.md §1.2.4 |
+| BB-F012 | engine | 名称大小写 | - | 表名大小写敏感：建表 Student 后小写引用报 UnknownTable | grammar.md §1.2.4 |
 | BB-G001 | engine | 词法字面量 | - | 非法字符 @ 报词法错误 | grammar.md §1.2.8 |
 | BB-G002 | engine | 词法字面量 | - | 非法字符 # 报词法错误 | grammar.md §1.2.8 |
 | BB-G003 | engine | 词法字面量 | - | 非法字符 $ 报词法错误 | grammar.md §1.2.8 |
