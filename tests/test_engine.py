@@ -102,6 +102,25 @@ def test_e2e_bulk_insert_select(db):
     assert result.rows[-1] == [119, "v119"]
 
 
+def test_e2e_multi_row_insert(db):
+    """单条 INSERT 多行 VALUES：一次插入多行并汇总影响行数（缺陷 #3 修复）。"""
+    db.execute("CREATE TABLE t(id INT, val VARCHAR);")
+    result = db.execute(
+        "INSERT INTO t(id,val) VALUES(1,'a'),(2,'b'),(3,'c');")
+    assert result.kind == "INSERT"
+    assert result.rows_affected == 3
+    assert result.message == "3 rows inserted"
+    assert db.execute("SELECT id,val FROM t;").rows == \
+        [[1, "a"], [2, "b"], [3, "c"]]
+    # 多行插入同样遵循列清单映射与跨页扩展
+    db.execute("INSERT INTO t(val,id) VALUES('d',4),('e',5);")
+    assert db.execute("SELECT id FROM t;").rows == [[1], [2], [3], [4], [5]]
+    # 多行中任一行列数不符 → 语义错误，整条 INSERT 不执行
+    with pytest.raises(ColumnCountMismatch):
+        db.execute("INSERT INTO t(id,val) VALUES(9,'x'),(10);")
+    assert db.execute("SELECT id FROM t;").rows == [[1], [2], [3], [4], [5]]
+
+
 # ======================================================================
 # TC-E2E-03 条件查询准确性
 # ======================================================================
@@ -403,7 +422,24 @@ def test_insert_unknown_column(db):
 def test_execute_empty_and_whitespace(db):
     assert db.execute("") is None
     assert db.execute("   ") is None
-    assert db.execute(";") is None
+    # 孤立分号 / 多余分号不再被宽容为空输入（缺陷 #4 修复），语法层拒绝
+    for bad in (";", ";;", ";;;"):
+        with pytest.raises(SQLError):
+            db.execute(bad)
+    with pytest.raises(SQLError):
+        db.execute("INSERT INTO t VALUES(1);;")
+
+
+def test_execute_script_rejects_empty_statements(db):
+    """execute_script 遇到孤立分号 / 连续分号抛语法错误（缺陷 #4 修复）。"""
+    for bad in (";", ";;", "INSERT INTO t VALUES(1);;"):
+        with pytest.raises(SQLError):
+            db.execute_script(bad)
+    # 末尾缺分号仍宽容补全（BB-I003），纯注释脚本仍为空脚本
+    db.execute("CREATE TABLE t(a INT);")
+    rs = db.execute_script("INSERT INTO t VALUES(1); SELECT a FROM t")
+    assert [r.kind for r in rs] == ["INSERT", "SELECT"]
+    assert db.execute_script("-- only comment") == []
 
 
 def test_execute_bad_sql_never_crashes(db):

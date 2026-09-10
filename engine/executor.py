@@ -3,7 +3,8 @@
 把 SQL 编译器产出的逻辑执行计划翻译为对存储引擎的实际操作，实现算子：
 
     CreateTable   建表:注册系统目录并持久化(FR-3.5)
-    Insert        行序列化写入数据页,表满自动扩展新页(FR-3.5)
+    Insert        行序列化写入数据页,表满自动扩展新页(FR-3.5);
+                  一条语句可含多行 VALUES,逐行插入并汇总影响行数
     SeqScan       顺序扫描表的所有数据页(FR-3.1)
     Filter        依据 WHERE 谓词对记录过滤(FR-3.1,含 NULL 三值逻辑)
     Project       依据 SELECT 列清单投影(FR-3.1)
@@ -151,17 +152,26 @@ class Executor:
         table = self._catalog.table_storage(plan.table)
         col_defs = table.columns
         col_index = {c.name: i for i, c in enumerate(col_defs)}
-        full = [None] * len(col_defs)
-        for col_name, lit in zip(plan.columns, plan.values):
-            key = col_name
-            if key not in col_index:
-                raise EngineError("unknown column %r in table %r" % (col_name, table.name))
-            full[col_index[key]] = lit.value
-        converted = self._coerce(full, col_defs)
-        pages_changed = table.insert_row(converted)
+        affected = 0
+        pages_changed = False
+        # 一条 INSERT 可含多行 VALUES:逐行映射列序、类型转换后插入(FR-3.5)
+        for row in plan.rows:
+            full = [None] * len(col_defs)
+            for col_name, lit in zip(plan.columns, row):
+                key = col_name
+                if key not in col_index:
+                    raise EngineError(
+                        "unknown column %r in table %r" % (col_name, table.name))
+                full[col_index[key]] = lit.value
+            converted = self._coerce(full, col_defs)
+            if table.insert_row(converted):
+                pages_changed = True
+            affected += 1
         if pages_changed:
             self._catalog.save()
-        return ExecutionResult("INSERT", rows_affected=1, message="1 row inserted")
+        message = ("1 row inserted" if affected == 1
+                   else "%d rows inserted" % affected)
+        return ExecutionResult("INSERT", rows_affected=affected, message=message)
 
     @staticmethod
     def _coerce(values: List[Any], col_defs: List[ColumnInfo]) -> List[Any]:

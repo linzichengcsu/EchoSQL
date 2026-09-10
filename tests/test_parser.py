@@ -117,14 +117,37 @@ def test_insert_with_column_list():
     assert isinstance(stmt, InsertStmt)
     assert stmt.table == "t"
     assert stmt.columns == ["a", "b"]
-    assert [v.value for v in stmt.values] == [1, "x"]
+    assert [v.value for v in stmt.rows[0]] == [1, "x"]
 
 
 def test_insert_without_column_list():
     ast = parse(lex("INSERT INTO t VALUES (1, 'x');"))
     stmt = ast.statements[0]
     assert stmt.columns is None
-    assert len(stmt.values) == 2
+    assert len(stmt.rows) == 1
+    assert len(stmt.rows[0]) == 2
+
+
+def test_insert_multi_row_values():
+    """单条 INSERT 可带多行 VALUES（grammar.md §2）。"""
+    ast = parse(lex("INSERT INTO t(a, b) VALUES (1, 'x'), (2, 'y'), (3, 'z');"))
+    stmt = ast.statements[0]
+    assert isinstance(stmt, InsertStmt)
+    assert len(stmt.rows) == 3
+    assert [[v.value for v in row] for row in stmt.rows] == [[1, "x"], [2, "y"], [3, "z"]]
+
+
+def test_insert_multi_row_without_column_list():
+    ast = parse(lex("INSERT INTO t VALUES (1, 'x'), (2, 'y');"))
+    stmt = ast.statements[0]
+    assert stmt.columns is None
+    assert [[v.value for v in row] for row in stmt.rows] == [[1, "x"], [2, "y"]]
+
+
+def test_insert_multi_row_missing_row_rejected():
+    """多行 VALUES 中缺括号的畸形行仍被语法拒绝。"""
+    with pytest.raises(ParseError):
+        parse(lex("INSERT INTO t VALUES (1, 'x'), 2, 'y';"))
 
 
 def test_delete_with_where():

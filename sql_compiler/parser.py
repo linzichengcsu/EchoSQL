@@ -153,12 +153,20 @@ class Parser:
                 columns.append(self._expect(TokenType.IDENTIFIER, "column name IDENTIFIER").lexeme)
             self._expect(TokenType.RPAREN, "')'")
         self._expect_keyword("VALUES")
+        # VALUES row (',' row)*:一条语句可插入多行(grammar.md §2)
+        rows = [self.parse_row()]
+        while self._match(TokenType.COMMA):
+            rows.append(self.parse_row())
+        return InsertStmt(kw.line, kw.col, table.lexeme, columns, rows)
+
+    def parse_row(self) -> list:
+        """row := '(' literal (',' literal)* ')'  —— VALUES 中的一行值。"""
         self._expect(TokenType.LPAREN, "'('")
         values = [self.parse_literal()]
         while self._match(TokenType.COMMA):
             values.append(self.parse_literal())
         self._expect(TokenType.RPAREN, "')'")
-        return InsertStmt(kw.line, kw.col, table.lexeme, columns, values)
+        return values
 
     def parse_literal(self) -> Literal:
         tok = self._peek()

@@ -88,13 +88,17 @@ class CreateTableStmt(Statement):
 
 @dataclass(frozen=True)
 class InsertStmt(Statement):
-    """insert_stmt := INSERT INTO IDENTIFIER column_list? VALUES '(' literal (',' literal)* ')'
-    columns 为 None 表示省略列清单(按表定义列序)。
+    """insert_stmt := INSERT INTO IDENTIFIER column_list? VALUES row (',' row)*
+    row      := '(' literal (',' literal)* ')'
+
+    columns 为 None 表示省略列清单(按表定义列序);
+    rows 为多行字面量,每个元素是一行的 literal 列表(单行插入时长度为 1),
+    如 `VALUES (1,'a'),(2,'b')` → rows == [[1, 'a'], [2, 'b']]。
     """
 
     table: str
     columns: Optional[List[str]]
-    values: List["Literal"]
+    rows: List[List["Literal"]]
 
 
 @dataclass(frozen=True)

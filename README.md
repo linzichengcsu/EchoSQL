@@ -168,6 +168,7 @@ db.execute("CREATE TABLE student(id INT, name VARCHAR, age INT);")  # OK
 db.execute("INSERT INTO student VALUES(1,'Alice',20);")             # 1 row inserted
 db.execute("INSERT INTO student VALUES(2,'Bob',17);")
 db.execute("INSERT INTO student VALUES(3,'Carol',22);")
+db.execute("INSERT INTO student VALUES(4,'Dan',19),(5,'Eve',21);")  # 多行：2 rows inserted
 
 result = db.execute("SELECT id,name FROM student WHERE age > 18;")  # 条件查询
 print(result.format())        # SELECT 输出对齐表格 / 其余输出 message
@@ -175,9 +176,12 @@ print(result.format())        # SELECT 输出对齐表格 / 其余输出 message
 # ----+-------
 # 1   | Alice
 # 3   | Carol
+# 4   | Dan
+# 5   | Eve
 
 db.execute("DELETE FROM student WHERE id = 2;")                     # 1 row deleted
 db.execute_script("...;...;")     # 按 ';' 切分逐条执行，返回结果列表
+                                  # 空语句（孤立/连续分号）报 ParseError，不静默跳过
 db.tables() / db.table_infos()    # 目录查询（FR-3.3）
 db.stats()                        # 缓存命中率等运行统计（贯通 FR-2.2）
 db.drop_table("student")          # 删表并回收全部数据页（FR-3.2 表的回收）
@@ -197,7 +201,8 @@ http://127.0.0.1:5000，可直接在页面上执行 SQL 并查看结果表格。
 
 引擎内部结构（三模块 + 门面）：
 - `executor.py` 执行引擎（FR-3.1）：CreateTable / Insert / SeqScan / Filter /
-  Project / Delete 算子；表达式求值遵循 SQL 三值逻辑（NULL 为 unknown），
+  Project / Delete 算子（Insert 支持单条语句多行 `VALUES`，逐行写入并汇总影响行数）；
+  表达式求值遵循 SQL 三值逻辑（NULL 为 unknown），
   与编译期常量折叠（planner）语义一致；
 - `storage_engine.py` 存储引擎（FR-3.2）：`RowPage` 槽页（页头 + 槽数组 +
   行数据 + 空闲区，SRS 第 6 章）、`encode_row/decode_row` 行序列化
@@ -239,18 +244,41 @@ P5 阶段聚焦「系统测试、边界测试、优化、调试」，交付如�
 - 覆盖率：`pytest tests --cov=. --cov-report=term-missing`（核心模块均 >90%）；
 - 补齐缺口：`cli` 模块由 0% 覆盖到全绿（test_cli.py）。
 
-### 3. 缺陷修复记录（调试）
+### 3. 缺陷修复记录（调试：P5 阶段 #1/#2，P6 黑盒回归 #3/#4）
 
 | 编号 | 缺陷 | 修复 | 验证 |
 | --- | --- | --- | --- |
 | #1 | INT 字面量超出 32 位范围时 `struct.pack` 抛未定义异常 `struct.error`（CLI/Web 层无法捕获，Web 直接 500） | `encode_row` 增加 32 位范围检查，改抛 `RowTooLarge`（EngineError 子类，`[RowTooLarge, ...]` 格式） | test_boundary `test_int_32bit_range_boundary` / `test_api_int_overflow_returns_400`；Web 返回 400 而非 500 |
 | #2 | grammar.md §1.2.5 承诺浮点 `1.`、`.5` 合法，词法分析器实际拒绝 | lexer `_lex_number` 支持三种浮点形式（`3.14` / `1.` / `.5`），`1.2.3`、`.5.6`、`12abc` 等仍按非法数字报错 | test_boundary `test_lexer_float_forms_from_grammar` / `test_lexer_float_illegal_still_rejected` |
+| #3（P6 黑盒） | **无法插入多行数据**：`insert_stmt` 文法与实现只允许单行 `VALUES (...)`，`INSERT INTO t VALUES (1,'a'),(2,'b');` 直接报 `[ParseError, ..., expected ';', got ',']` | 文法扩展为 `VALUES row (',' row)*`（grammar.md §2）：`InsertStmt`/`InsertPlan` 的 `values` 改为 `rows` 多行结构，`parse_row` 解析每行，semantic 逐行校验列数/类型，executor 逐行插入并汇总 `rows_affected`（`N rows inserted`） | test_parser `test_insert_multi_row_values`；test_engine `test_e2e_multi_row_insert`；黑盒 `BB-B031~BB-B035` / `BB-I012` / `BB-L016` / `BB-M018` |
+| #4（P6 黑盒） | **孤立分号 / 双重或多重分号被错误地编译通过**：`Database.execute` 把「仅含分号的输入」当作空输入返回 `None`，`split_statements` 把连续分号作为空语句跳过，导致 `;`、`;;`、`;;;`、`INSERT ...;;` 均不报错 | 删除 execute 的「仅含分号视为空输入」分支（仅 `lex` 后只剩 EOF 才算空输入）；`split_statements` 不再丢弃空语句，而是保留空组交由 `parse` 抛 `ParseError`；grammar.md §2 明确空语句非法 | test_engine `test_execute_empty_and_whitespace` / `test_execute_script_rejects_empty_statements`；test_boundary `test_empty_database_initial_state`；黑盒 `BB-K003` / `BB-K021` / `BB-K022` / `BB-I004` / `BB-I011` / `BB-L014` / `BB-L015` / `BB-M017` |
 
 ### 4. 已知限制（文法内不承诺，不视为缺陷）
 
 - 无一元负号：`-1` 不能作为字面量（literal 文法仅 INT_CONST / FLOAT_CONST / STRING / TRUE / FALSE / NULL）；
 - 不支持科学计数法（`1e3` 报 LexError）；
-- 孤立分号 `;` 在语法层拒绝（`Database.execute` 层宽容处理）。
+- 空语句非法：孤立分号 `;` 与连续分号 `;;` 在语法层被拒绝（`Database.execute` 与
+  `execute_script` 均抛 ParseError）；仅「空串 / 纯空白 / 纯注释」按空输入处理（返回 `None`）；
+- 仅末尾缺分号宽容：`execute_script` 对**最后一条语句缺分号**补全后执行，其余位置缺分号仍报错。
+
+## P6 黑盒测试（交付）
+
+黑盒测试只经产品对外接口观察被测系统（engine：`Database` 门面；cli：子进程 `main.py`
+的退出码与 stdout；web：REST API 状态码与 JSON），用例数据与被测脚本分离：
+
+```powershell
+python tests/test_blackbox.py                    # 运行全部黑盒用例
+python tests/blackbox_dataset.py --report tests/blackbox_dataset_report.md   # 重新生成数据集报告
+```
+
+| 指标 | 数值 |
+| --- | --- |
+| 黑盒用例总数 | 253（engine 219 / cli 16 / web 18） |
+| 边界用例数 / 占比 | 75 / 29.64%（要求 >= 200 且占比 >= 5%，`test_dataset_requirement_audit` 硬断言） |
+
+黑盒回归发现并修复的缺陷见上节 `#3`（无法插入多行数据）与 `#4`（孤立分号、双重或多重分号
+被错误地编译通过）；相应新增回归用例 `BB-B031~BB-B035`、`BB-I011`、`BB-I012`、
+`BB-K003`、`BB-K021`、`BB-K022`、`BB-L014~BB-L016`、`BB-M017`、`BB-M018`。
 
 ## 当前进度
 

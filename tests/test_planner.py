@@ -160,7 +160,7 @@ def test_insert_plan_with_explicit_columns():
     p = build_plans("INSERT INTO t(a, b) VALUES (1, 'x');", cat)[0]
     assert isinstance(p, InsertPlan)
     assert p.columns == ["a", "b"]
-    assert [v.value for v in p.values] == [1, "x"]
+    assert [v.value for v in p.rows[0]] == [1, "x"]
 
 
 def test_insert_plan_default_columns_expanded():

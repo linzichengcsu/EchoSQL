@@ -90,16 +90,13 @@ class Database:
         """编译并执行 SQL。
 
         支持一次输入多条语句(副作用全部生效),返回最后一条语句的结果;
-        空输入返回 None。编译错误(SQLError)与引擎错误(EngineError)直接抛出,
+        空输入(空串/纯空白/纯注释)返回 None。孤立分号或语句间多余分号属空语句,
+        不再视为空输入,而是抛出语法错误 ParseError(grammar.md §2);
+        编译错误(SQLError)与引擎错误(EngineError)直接抛出,
         由调用方(CLI/Web)捕获后展示,不崩溃。
         """
         tokens = lex(sql)
-        if len(tokens) <= 1:  # 仅 EOF
-            return None
-        # 仅含分号（空语句）视为空输入
-        if not any(
-            t.type not in (TokenType.SEMICOLON, TokenType.EOF) for t in tokens
-        ):
+        if len(tokens) <= 1:  # 仅 EOF，即空输入(含纯空白/纯注释)
             return None
         ast = parse(tokens)
         analyze(ast, self.catalog_mgr.catalog)
@@ -173,7 +170,9 @@ def split_statements(sql: str) -> List[List]:
     """把 SQL 文本按 ';' 切分为 Token 组(每组一条语句,含结尾 ';')。
 
     基于词法分析器切分,字符串字面量内的分号不会被误切(TC-E2E 健壮性);
-    空语句(连续/多余分号)跳过;末尾缺分号时宽容补一个。
+    孤立分号 / 连续分号是空语句,不再跳过,而是作为独立组交给语法分析器,
+    由 parse 抛出 ParseError(语法层拒绝,grammar.md §2);
+    末尾缺分号时宽容补一个。
     """
     from sql_compiler import Token
 
@@ -182,10 +181,9 @@ def split_statements(sql: str) -> List[List]:
     current: List = []
     for tok in tokens:
         if tok.type is TokenType.SEMICOLON:
-            if current:
-                current.append(tok)  # 保留 ';' 作为语句结束符(parse 需要消费)
-                groups.append(current)
-                current = []
+            current.append(tok)  # ';' 既结束当前语句,又作为该语句的结束符
+            groups.append(current)
+            current = []
         elif tok.type is not TokenType.EOF:
             current.append(tok)
     if current:

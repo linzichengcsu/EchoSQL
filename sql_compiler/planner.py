@@ -83,12 +83,14 @@ class CreateTablePlan(Plan):
 class InsertPlan(Plan):
     table: str
     columns: List[str]
-    values: List[Literal]
+    rows: List[List[Literal]]  # 多行字面量,每行一个 literal 列表
 
     def __str__(self):
-        vals = ", ".join(repr(v.value) for v in self.values)
+        rows = ", ".join(
+            "(%s)" % ", ".join(repr(v.value) for v in row) for row in self.rows
+        )
         return "Insert(%s, [%s], [%s])" % (
-            self.table, ", ".join(self.columns), vals,
+            self.table, ", ".join(self.columns), rows,
         )
 
 
@@ -168,7 +170,7 @@ class Planner:
                 columns = table.column_names() if table else []
             else:
                 columns = list(stmt.columns)
-            return InsertPlan(stmt.table, columns, list(stmt.values))
+            return InsertPlan(stmt.table, columns, [list(row) for row in stmt.rows])
         if isinstance(stmt, SelectStmt):
             return self._build_select(stmt)
         if isinstance(stmt, DeleteStmt):

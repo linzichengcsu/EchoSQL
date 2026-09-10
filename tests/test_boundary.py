@@ -124,7 +124,7 @@ def test_pipeline_empty_and_semicolons():
         result = pipeline(sql, Catalog())
         assert len(result.ast.statements) == 0
         assert result.plans == []
-    # 孤立分号不能作为语句起始（parser 语法层拒绝；Database.execute 层才宽容）
+    # 孤立分号 / 连续分号不能作为语句起始（语法层拒绝，Database 入口同样拒绝）
     for sql in (";", ";;;"):
         with pytest.raises(ParseError):
             pipeline(sql, Catalog())
@@ -219,9 +219,14 @@ def test_empty_database_initial_state(db):
     assert db.stats()["tables"] == 0
     assert db.execute("") is None
     assert db.execute("   ") is None
-    assert db.execute(";") is None
+    # 孤立分号 / 多余分号不再宽容为空输入（缺陷 #4 修复）：语法层拒绝
+    from sql_compiler import ParseError
+    for bad in (";", ";;", ";;;"):
+        with pytest.raises(ParseError):
+            db.execute(bad)
     assert db.execute_script("") == []
-    assert db.execute_script(";;;") == []
+    with pytest.raises(ParseError):
+        db.execute_script(";;;")
 
 
 def test_select_empty_table_keeps_columns(db):

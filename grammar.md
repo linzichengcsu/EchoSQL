@@ -52,6 +52,7 @@
 
 ```
 program              := statement*
+
 statement            := create_table_stmt ';'
                       | insert_stmt ';'
                       | select_stmt ';'
@@ -61,7 +62,8 @@ create_table_stmt    := CREATE TABLE IDENTIFIER '(' column_def (',' column_def)*
 column_def           := IDENTIFIER data_type
 data_type            := INT | VARCHAR | FLOAT | CHAR
 
-insert_stmt          := INSERT INTO IDENTIFIER column_list? VALUES '(' literal (',' literal)* ')'
+insert_stmt          := INSERT INTO IDENTIFIER column_list? VALUES row (',' row)*
+row                  := '(' literal (',' literal)* ')'
 column_list          := '(' IDENTIFIER (',' IDENTIFIER)* ')'        -- 省略时按表定义列序
 
 select_stmt          := SELECT select_list FROM IDENTIFIER (WHERE expr)?
@@ -73,6 +75,10 @@ delete_stmt          := DELETE FROM IDENTIFIER (WHERE expr)?
 
 说明：
 - 每条语句以 `;` 结束，`program` 支持多条语句（`statement*`），也允许空输入；
+- **空语句不是合法的 statement**：孤立分号（`;`）、语句间连续分号（`;;`、`;;;` 等多余分号）
+  一律报语法错误（ParseError），不在编译层静默跳过；
+- `insert_stmt` 的 `VALUES` 支持**一行或多行**：`VALUES (1,'a'),(2,'b')` 在一条语句内
+  依次插入两行，成功时影响行数为所有行的总数；
 - 表名 / 列名均为 `IDENTIFIER`，**大小写敏感**（按原拼写精确匹配，见 §1.2.4）；
 - 关键字大小写不敏感。
 
@@ -115,7 +121,8 @@ literal     := INT_CONST | FLOAT_CONST | STRING | TRUE | FALSE | NULL
 
 1. 表存在性：`CREATE` / `INSERT` / `SELECT` / `DELETE` 引用的表必须在 Catalog 中注册（CREATE 则要求**未注册**）；
 2. 列存在性：投影列、WHERE 中引用的列、INSERT 列清单中的列必须属于该表；
-3. `INSERT`：值数量须等于列数（指定列清单时为清单长度，否则为表全部列数），且逐列类型匹配；
+3. `INSERT`：每条 VALUES 行的值数量须等于列数（指定列清单时为清单长度，否则为表全部列数），
+   且逐列类型匹配；多行 VALUES 中任一行不合法，整条 INSERT 报错、不插入任何行；
 4. 运算符类型规则：
 
 | 运算符 | 要求 | 结果类型 |

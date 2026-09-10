@@ -6,9 +6,9 @@
 
 | 指标 | 数值 |
 | --- | --- |
-| 总用例数 | 239 |
-| 边界用例数 | 67 |
-| 边界占比 | 28.03% |
+| 总用例数 | 253 |
+| 边界用例数 | 75 |
+| 边界占比 | 29.64% |
 | 要求：总用例 >= 200 | 满足 |
 | 要求：边界占比 >= 5% | 满足 |
 
@@ -16,29 +16,29 @@
 
 | 层 | 用例数 |
 | --- | --- |
-| cli | 13 |
-| engine | 210 |
-| web | 16 |
+| cli | 16 |
+| engine | 219 |
+| web | 18 |
 
 ## 类别分布
 
 | 类别 | 用例数 |
 | --- | --- |
-| CLI | 13 |
+| CLI | 16 |
 | NULL | 12 |
-| Web | 16 |
+| Web | 18 |
 | 删除 | 16 |
 | 名称大小写 | 12 |
 | 建表 | 12 |
-| 插入 | 30 |
+| 插入 | 35 |
 | 查询 | 46 |
 | 目录持久化 | 12 |
-| 脚本批处理 | 10 |
+| 脚本批处理 | 12 |
 | 表达式 | 18 |
 | 词法字面量 | 22 |
-| 边界 | 20 |
+| 边界 | 22 |
 
-## 边界用例清单（67 条）
+## 边界用例清单（75 条）
 
 | 编号 | 类别 | 标题 |
 | --- | --- | --- |
@@ -48,6 +48,8 @@
 | BB-B024 | 插入 | INT 32 位上限值可插入并回读 |
 | BB-B025 | 插入 | INT 超过 32 位上限被引擎拒绝（RowTooLarge） |
 | BB-B026 | 插入 | 超大 INT 字面量被引擎拒绝而非崩溃 |
+| BB-B033 | 插入 | 多行 VALUES 中任一行列数不符报 ColumnCountMismatch |
+| BB-B035 | 插入 | 单条语句 60 行 VALUES 跨页存储后全部可查回 |
 | BB-C005 | 查询 | 空表 SELECT 保留列头、行集为空 |
 | BB-C007 | 查询 | 等值比较命中临界值（=3） |
 | BB-C008 | 查询 | 不等于（<>）排除临界值 |
@@ -81,10 +83,12 @@
 | BB-H005 | 表达式 | 40 层括号嵌套不崩溃且求值正确 |
 | BB-H016 | 表达式 | 120 项 OR 长链全不命中返回空集 |
 | BB-I003 | 脚本批处理 | execute_script 末尾缺分号宽容执行 |
+| BB-I004 | 脚本批处理 | 脚本中连续分号（空语句）被语法拒绝 |
 | BB-I009 | 脚本批处理 | 脚本中任一语句词法错误则整体不执行 |
+| BB-I011 | 脚本批处理 | 语句间多余分号（空语句）报语法错误 |
 | BB-K001 | 边界 | 空字符串输入返回 None |
 | BB-K002 | 边界 | 纯空白输入返回 None |
-| BB-K003 | 边界 | 孤立分号输入返回 None |
+| BB-K003 | 边界 | 孤立分号输入报语法错误 |
 | BB-K004 | 边界 | 单 VARCHAR 列 4000 字符可存可回读 |
 | BB-K005 | 边界 | 单 VARCHAR 列 4080 字符恰可容纳 |
 | BB-K006 | 边界 | 单 VARCHAR 列 4090 字符超页被拒绝 |
@@ -102,15 +106,19 @@
 | BB-K018 | 边界 | 对已清空表重复 DELETE 安全返回 0 |
 | BB-K019 | 边界 | 四类列型整行往返一致 |
 | BB-K020 | 边界 | 640 字长中文串入库回读一致 |
+| BB-K021 | 边界 | 多重分号（;;;）输入报语法错误 |
+| BB-K022 | 边界 | 语句后多余分号（;;）报语法错误 |
 | BB-L004 | CLI | 批处理中 INT 溢出打印 RowTooLarge |
 | BB-L006 | CLI | REPL 词法错误打印不崩溃 |
 | BB-L009 | CLI | FIFO 策略 + 容量 1 的批处理可运行 |
+| BB-L014 | CLI | REPL 孤立分号打印语法错误 |
 | BB-M006 | Web | API 空表查询返回列头与空行 |
 | BB-M009 | Web | API INT 溢出返回 400 而非 500 |
 | BB-M010 | Web | API 空 SQL 返回 EMPTY |
 | BB-M012 | Web | API 非 JSON 请求体按空 SQL 处理 |
+| BB-M017 | Web | API 孤立分号返回 400（语法错误） |
 
-## 全部用例清单（239 条）
+## 全部用例清单（253 条）
 
 | 编号 | 层 | 类别 | 边界 | 标题 | 需求追溯 |
 | --- | --- | --- | --- | --- | --- |
@@ -156,6 +164,11 @@
 | BB-B028 | engine | 插入 | - | CHAR 列可存字符串并回读 | grammar.md §2 |
 | BB-B029 | engine | 插入 | - | NULL 写入 FLOAT 列回读为 NULL | grammar.md §4.1 |
 | BB-B030 | engine | 插入 | - | 脚本连续插入三行后计数正确 | FR-3.5 |
+| BB-B031 | engine | 插入 | - | 单条 INSERT 多行 VALUES 一次插入多行 | grammar.md §2 |
+| BB-B032 | engine | 插入 | - | 多行 VALUES 配合列清单按清单列序映射 | grammar.md §2 |
+| BB-B033 | engine | 插入 | 是 | 多行 VALUES 中任一行列数不符报 ColumnCountMismatch | grammar.md §4.2 |
+| BB-B034 | engine | 插入 | - | 多行 VALUES 中 NULL 与 INT→FLOAT 转换正确 | grammar.md §4.2 |
+| BB-B035 | engine | 插入 | 是 | 单条语句 60 行 VALUES 跨页存储后全部可查回 | FR-3.2 表扩展 |
 | BB-C001 | engine | 查询 | - | SELECT * 返回全列与全部行 | FR-3.1 |
 | BB-C002 | engine | 查询 | - | 按列清单投影 | FR-3.1 |
 | BB-C003 | engine | 查询 | - | 投影列序按书写顺序输出 | FR-3.1 |
@@ -285,13 +298,15 @@
 | BB-I001 | engine | 脚本批处理 | - | 多语句 execute 返回最后一条语句结果 | FR-3.4 |
 | BB-I002 | engine | 脚本批处理 | - | execute_script 返回各语句结果序列 | FR-3.4 |
 | BB-I003 | engine | 脚本批处理 | 是 | execute_script 末尾缺分号宽容执行 | FR-3.4 |
-| BB-I004 | engine | 脚本批处理 | - | 脚本中连续分号空语句被跳过 | FR-3.4 |
+| BB-I004 | engine | 脚本批处理 | 是 | 脚本中连续分号（空语句）被语法拒绝 | grammar.md §2 |
 | BB-I005 | engine | 脚本批处理 | - | 脚本中途出错立即抛出 | FR-3.4 |
 | BB-I006 | engine | 脚本批处理 | - | 脚本出错后已生效副作用保留 | FR-3.4 |
 | BB-I007 | engine | 脚本批处理 | - | 脚本含注释与空行只执行真实语句 | FR-3.4 |
 | BB-I008 | engine | 脚本批处理 | - | 脚本末尾空白与无分号宽容处理 | FR-3.4 |
 | BB-I009 | engine | 脚本批处理 | 是 | 脚本中任一语句词法错误则整体不执行 | FR-1.1 |
 | BB-I010 | engine | 脚本批处理 | - | CRLF 行尾的脚本正常执行 | grammar.md §1.2.1 |
+| BB-I011 | engine | 脚本批处理 | 是 | 语句间多余分号（空语句）报语法错误 | grammar.md §2 |
+| BB-I012 | engine | 脚本批处理 | - | 单条 INSERT 多行 VALUES 在脚本中一次插入 | grammar.md §2 |
 | BB-J001 | engine | 目录持久化 | - | 全新空库 tables() 为空 | FR-3.3 |
 | BB-J002 | engine | 目录持久化 | - | 建表顺序记录在 tables() | FR-3.3 |
 | BB-J003 | engine | 目录持久化 | - | table_infos 返回列名与列类型 | FR-3.3 |
@@ -306,7 +321,7 @@
 | BB-J012 | engine | 目录持久化 | - | 删表并重启：表已删除且可重建 | FR-3.2 |
 | BB-K001 | engine | 边界 | 是 | 空字符串输入返回 None | FR-3.4 / 边界 |
 | BB-K002 | engine | 边界 | 是 | 纯空白输入返回 None | FR-3.4 / 边界 |
-| BB-K003 | engine | 边界 | 是 | 孤立分号输入返回 None | FR-3.4 / 边界 |
+| BB-K003 | engine | 边界 | 是 | 孤立分号输入报语法错误 | grammar.md §2 |
 | BB-K004 | engine | 边界 | 是 | 单 VARCHAR 列 4000 字符可存可回读 | 行容量上限 |
 | BB-K005 | engine | 边界 | 是 | 单 VARCHAR 列 4080 字符恰可容纳 | 行容量上限 |
 | BB-K006 | engine | 边界 | 是 | 单 VARCHAR 列 4090 字符超页被拒绝 | 行容量上限 |
@@ -324,6 +339,8 @@
 | BB-K018 | engine | 边界 | 是 | 对已清空表重复 DELETE 安全返回 0 | 重复删除 |
 | BB-K019 | engine | 边界 | 是 | 四类列型整行往返一致 | 数据保真 |
 | BB-K020 | engine | 边界 | 是 | 640 字长中文串入库回读一致 | 中文字符串长度 |
+| BB-K021 | engine | 边界 | 是 | 多重分号（;;;）输入报语法错误 | grammar.md §2 |
+| BB-K022 | engine | 边界 | 是 | 语句后多余分号（;;）报语法错误 | grammar.md §2 |
 | BB-L001 | cli | CLI | - | 批处理脚本成功执行并回显结果 | FR-3.4 / SRS 5.1 |
 | BB-L002 | cli | CLI | - | 批处理中未知表错误返回码 1 且打印错误 | FR-3.4 |
 | BB-L003 | cli | CLI | - | 批处理中类型错误返回码 1 且打印错误 | FR-3.4 |
@@ -337,6 +354,9 @@
 | BB-L011 | cli | CLI | - | 批处理删除流程输出正确 | FR-3.5 |
 | BB-L012 | cli | CLI | - | 脚本末句无分号宽容执行并统计语句数 | FR-3.4 |
 | BB-L013 | cli | CLI | - | REPL exit 别名退出 | SRS 5.1 |
+| BB-L014 | cli | CLI | 是 | REPL 孤立分号打印语法错误 | grammar.md §2 |
+| BB-L015 | cli | CLI | - | 批处理中空语句（多余分号）报错返回码 1 | grammar.md §2 |
+| BB-L016 | cli | CLI | - | 批处理中单条多行 INSERT 一次插入并回显行数 | grammar.md §2 |
 | BB-M001 | web | Web | - | 健康检查返回 200 与状态 ok | SRS 2.3 |
 | BB-M002 | web | Web | - | 首页返回 200 | SRS 2.3 |
 | BB-M003 | web | Web | - | API 建表返回 200 与 OK | SRS 2.3 |
@@ -353,3 +373,5 @@
 | BB-M014 | web | Web | - | GET /api/stats 返回运行统计 | FR-2.2 |
 | BB-M015 | web | Web | - | 未知 API 路由返回 404 | SRS 2.3 |
 | BB-M016 | web | Web | - | API 查询返回 NULL 与浮点 JSON 值 | SRS 2.3 |
+| BB-M017 | web | Web | 是 | API 孤立分号返回 400（语法错误） | grammar.md §2 |
+| BB-M018 | web | Web | - | API 多行 INSERT 返回多行影响行数 | grammar.md §2 |

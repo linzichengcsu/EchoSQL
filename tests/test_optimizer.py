@@ -240,7 +240,7 @@ def test_optimize_non_predicate_plans_unchanged():
     assert [type(p) for p in after] == [CreateTablePlan, InsertPlan]
     # 结构串一致（建表/插入无折叠对象）
     assert after[0].table == "s"
-    assert isinstance(after[1], InsertPlan) and after[1].values[0].value == 1
+    assert isinstance(after[1], InsertPlan) and after[1].rows[0][0].value == 1
 
 
 def test_optimize_is_idempotent():

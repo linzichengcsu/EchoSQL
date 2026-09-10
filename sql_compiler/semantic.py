@@ -106,15 +106,18 @@ class SemanticAnalyzer:
                         % (col_name, table.name),
                     )
                 target.append(col)
-        if len(stmt.values) != len(target):
-            raise ColumnCountMismatch(
-                stmt.line, stmt.col,
-                "INSERT has %d values but %d columns (%s)"
-                % (len(stmt.values), len(target), table.name),
-            )
-        # 逐列类型匹配(TC-S-03)
-        for col, lit in zip(target, stmt.values):
-            self._check_literal_type(stmt, col, lit)
+        # 逐行检查值数量与列序(grammar.md §4.2:值数量须等于列数)
+        for row in stmt.rows:
+            where = row[0] if row else stmt
+            if len(row) != len(target):
+                raise ColumnCountMismatch(
+                    where.line, where.col,
+                    "INSERT has %d values but %d columns (%s)"
+                    % (len(row), len(target), table.name),
+                )
+            # 逐列类型匹配(TC-S-03)
+            for col, lit in zip(target, row):
+                self._check_literal_type(stmt, col, lit)
 
     def _check_literal_type(self, stmt: InsertStmt, col: ColumnInfo, lit: Literal):
         want = col.data_type
