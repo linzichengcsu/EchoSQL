@@ -103,7 +103,17 @@ export default function App() {
 
         {/* 主内容区 */}
         <Content style={{ overflow: 'auto' }}>
-          <Page health={health} onHealthChange={refreshHealth} />
+          {/*
+            SQL 控制台常驻挂载，仅用 display 控制显隐：
+            切换左侧菜单不会卸载组件，编辑器内容、执行结果与执行历史因此全部保留。
+            其余页面维持原有的“按需挂载”行为不变。
+          */}
+          <div style={{ height: '100%', display: active === 'console' ? 'block' : 'none' }}>
+            <ConsolePage />
+          </div>
+          {active === 'console' ? null : (
+            <Page health={health} onHealthChange={refreshHealth} />
+          )}
         </Content>
       </Layout>
 
