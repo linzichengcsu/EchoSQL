@@ -220,3 +220,11 @@ __marimo__/
 # Documents
 /docs/
 /ai/
+
+# ---- 前端（React + Vite，见 web/frontend/）----
+node_modules/
+web/frontend/.npm-cache/
+npm-debug.log*
+.npm/
+# 构建产物由 vite build 生成（web/static/react/），保留在仓库中以供 Flask 直接托管
+

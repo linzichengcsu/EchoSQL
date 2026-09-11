@@ -1,24 +1,55 @@
-"""MiniDB Flask Web 应用（P4：接入数据库引擎）。
+"""MiniDB Flask Web 应用（P4：接入数据库引擎；P7：接入 React 前端）。
 
 提供 Web 控制台与 REST API（SRS 2.3「也可通过 API 调用」）：
-    GET  /             Web 控制台（SQL 编辑 + 结果表格）
+    GET  /             Web 控制台（React + Ant Design 单页应用）
     GET  /api/health   健康检查（环境与依赖版本）
     POST /api/sql      执行 SQL，返回结果/错误（FR-3.4 API）
     GET  /api/tables   列出全部表及结构（FR-3.3 目录查询）
     GET  /api/stats    页缓存命中率等运行统计（FR-2.2）
+
+前端：web/frontend/（Vite + React + Ant Design），构建产物输出到
+web/static/react/，由本应用静态托管；前端源码未构建时首页给出构建指引。
 
 启动方式：
     python -m web.app            # http://127.0.0.1:5000
 """
 import platform
 import sys
+from pathlib import Path
 
-from flask import Flask, jsonify, render_template, request
+from flask import Flask, jsonify, render_template, request, send_from_directory
 
 from engine import Database, EngineError
 from sql_compiler import SQLError
 
 _db = None
+
+# React 前端构建产物目录（vite build → web/static/react/）
+_FRONTEND_DIST = Path(__file__).resolve().parent / "static" / "react"
+_FRONTEND_ASSETS = _FRONTEND_DIST / "assets"
+
+
+def collect_frontend_assets():
+    """定位前端构建产物，返回 (js, css) 相对 static 的路径。
+
+    未构建时返回 (None, None)，首页据此显示构建指引。
+    以后若改为带 hash 的文件名，本函数仍能自动识别入口资源。
+    """
+    if not _FRONTEND_ASSETS.is_dir():
+        return None, None
+    names = sorted(p.name for p in _FRONTEND_ASSETS.iterdir() if p.is_file())
+
+    def _pick(ext: str) -> str:
+        exact = f"index{ext}"
+        if exact in names:
+            return exact
+        return next((n for n in names if n.endswith(ext)), "")
+
+    js, css = _pick(".js"), _pick(".css")
+    return (
+        f"react/assets/{js}" if js else None,
+        f"react/assets/{css}" if css else None,
+    )
 
 
 def get_db() -> Database:
@@ -35,7 +66,14 @@ def create_app():
 
     @app.get("/")
     def index():
-        return render_template("index.html", env=collect_env())
+        # 已构建：直接托管 Vite 产物入口（title 与资源引用由前端工程统一维护）
+        if (_FRONTEND_DIST / "index.html").is_file():
+            return send_from_directory(_FRONTEND_DIST, "index.html")
+        # 未构建：返回带构建指引的页面骨架
+        react_js, react_css = collect_frontend_assets()
+        return render_template(
+            "index.html", env=collect_env(), react_js=react_js, react_css=react_css
+        )
 
     @app.get("/api/health")
     def health():

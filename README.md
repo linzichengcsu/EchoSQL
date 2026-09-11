@@ -41,6 +41,10 @@ EchoSQL/
 │   └── errors.py        # 引擎运行时错误（EngineError / RowTooLarge / CatalogCorrupted）
 ├── cli/                 # 命令行接口（cmd REPL，FR-3.4）：输入 SQL 返回结果/错误，-f 批处理
 ├── web/                 # Flask Web 控制台与 API（/api/sql、/api/tables、/api/stats）
+│   ├── app.py           # 应用工厂 + REST API + 前端构建产物托管
+│   ├── templates/index.html  # 页面骨架（挂载 React 应用，未构建时给出指引）
+│   ├── frontend/        # React + Ant Design 前端源码（Vite 工程，P7 新增）
+│   └── static/react/    # 前端构建产物（vite build 输出，由 Flask 静态托管）
 ├── tests/               # pytest 测试（test_lexer/parser/semantic/planner/pipeline 编译器；test_storage 存储；
 │   │                    #   test_engine 引擎端到端 TC-E2E-01~05；test_web_api Web API 集成；
 │   │                    #   P5 新增 test_boundary 边界 / test_optimizer 规则优化 / test_cli 命令行；
@@ -105,6 +109,33 @@ python -m web.app               # http://127.0.0.1:5000（SQL 控制台）
 # 执行 SQL：POST /api/sql  {"sql": "SELECT * FROM t;"}
 # 表结构：  GET /api/tables     运行统计：GET /api/stats
 ```
+
+## Web 前端（React + Ant Design，P7 交付）
+
+Web 控制台为 React 单页应用，采用**经典 IDE 配色（VS Code Dark+：#1e1e1e 底 / #007acc 强调色）**，
+UI 组件基于现成的 **Ant Design 5**（Layout / Menu / Table / Tabs / Statistic / Card / Alert 等），
+不自行造轮子。前端源码在 `web/frontend/`，构建产物输出到 `web/static/react/`，由 Flask 直接托管。
+
+页面构成（左侧导航对应四个视图）：
+
+| 视图 | 内容 | 对接接口 |
+| --- | --- | --- |
+| SQL 控制台 | 仿 IDE 编辑区（等宽字体、Ctrl+Enter 执行）、示例 SQL、SELECT 结果表格（含行号列、NULL 斜体）、错误提示（错误类型 + 行:列）、执行历史 | `POST /api/sql` |
+| 数据表 | 表清单、列名与类型标签、数据页数量与页 ID | `GET /api/tables` |
+| 运行统计 | 缓存命中率环形图、容量/命中/未命中/驱逐/脏页、替换策略 | `GET /api/stats` |
+| 关于 | 系统链路（Steps）、运行环境版本、已实现能力、已知限制 | `GET /api/health` |
+
+构建与开发：
+
+```powershell
+cd web/frontend
+npm install          # 安装依赖（React 18 + antd 5 + Vite 5）
+npm run build        # 构建 → web/static/react/，随后刷新 http://127.0.0.1:5000 即可
+npm run dev          # 可选：前端热更新开发（5173 端口，已配置 /api 代理到 Flask 5000）
+```
+
+说明：`web/static/react/` 已随仓库提供构建产物，克隆后无需构建即可直接 `python -m web.app` 使用；
+若该目录缺失，首页会自动显示构建指引。前端构建需 Node 18+（本机验证 Node 24 / npm 11）。
 
 ## 文档索引
 
@@ -289,3 +320,4 @@ python tests/blackbox_dataset.py --report tests/blackbox_dataset_report.md   # �
 - [x] P4 数据库引擎（执行引擎 / 存储引擎 / Catalog / CLI + Web 集成）
 - [x] P5 测试与优化（新增边界/优化/CLI 测试 + 统一启动方法 + 缺陷修复，详见上节）
 - [x] P6 黑盒测试（将特定测试数据集注入测试脚本，不依赖内部调用）
+- [x] P7 Web 前端（React + Ant Design 单页应用，VS Code Dark+ IDE 配色，见上节）

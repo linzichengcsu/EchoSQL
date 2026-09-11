@@ -2,118 +2,46 @@
 <html lang="zh-CN">
 <head>
   <meta charset="UTF-8">
-  <title>MiniDB Web Console</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>EchoSQL Web Console · MiniDB</title>
+  {% if react_css %}<link rel="stylesheet" href="{{ url_for('static', filename=react_css) }}">{% endif %}
   <style>
-    body { font-family: "Segoe UI", "Microsoft YaHei", sans-serif; margin: 2rem auto; max-width: 860px;
-           color: #222; background: #f7f8fa; }
-    h1 { border-bottom: 2px solid #2b6cb0; padding-bottom: .4rem; }
-    code { background: #eef; padding: .1rem .4rem; border-radius: 4px; }
-    table { border-collapse: collapse; margin-top: 1rem; width: 100%; }
-    th, td { border: 1px solid #ccc; padding: .45rem .7rem; text-align: left; }
-    th { background: #e8eef7; }
-    .ok { color: #1a7f37; font-weight: bold; }
-    .err { color: #b00020; font-weight: bold; }
-    textarea { width: 100%; font-family: Consolas, monospace; font-size: 13px;
-               border: 1px solid #bbb; border-radius: 4px; padding: .5rem; box-sizing: border-box; }
-    button { margin-top: .5rem; padding: .45rem 1.2rem; background: #2b6cb0; color: #fff;
-             border: none; border-radius: 4px; cursor: pointer; }
-    button:hover { background: #2c5282; }
-    #result { margin-top: 1rem; }
-    #result .msg { padding: .6rem; background: #fff; border: 1px solid #ddd; border-radius: 4px; }
-    footer { margin-top: 2rem; color: #888; font-size: .85rem; }
+    html, body, #root { height: 100%; margin: 0; }
+    body {
+      background: #1e1e1e;
+      color: #d4d4d4;
+      font-family: 'Segoe UI', 'Microsoft YaHei', system-ui, sans-serif;
+    }
+    /* 前端产物缺失时的引导提示（IDE 暗色风格） */
+    .boot-hint {
+      max-width: 640px; margin: 12vh auto; padding: 24px 28px;
+      background: #252526; border: 1px solid #3c3c3c; border-left: 3px solid #007acc;
+      border-radius: 6px;
+    }
+    .boot-hint h1 { font-size: 18px; margin: 0 0 10px; color: #ffffff; }
+    .boot-hint p { color: #d4d4d4; line-height: 1.7; }
+    .boot-hint code {
+      background: #1e1e1e; border: 1px solid #3c3c3c; padding: 2px 6px;
+      border-radius: 4px; font-family: Consolas, 'Courier New', monospace; color: #ce9178;
+    }
+    .boot-hint ul { line-height: 2; padding-left: 20px; }
   </style>
 </head>
 <body>
-  <h1>MiniDB Web Console</h1>
-  <p>数据库管理系统课程设计 · Flask Web 控制台
-     （SQL 编译器 → 数据库引擎 → 页式存储 完整链路）</p>
-
-  <h2>SQL 控制台</h2>
-  <textarea id="sql" rows="5" placeholder="输入 SQL 并点击执行">-- 支持：CREATE TABLE / INSERT / SELECT(WHERE) / DELETE
--- 示例：
-CREATE TABLE student(id INT, name VARCHAR, age INT);
-INSERT INTO student(id, name, age) VALUES (1, 'Alice', 20);
-SELECT id, name FROM student WHERE age > 18;</textarea>
-  <br>
-  <button id="run" onclick="runSql()">执行</button>
-  <div id="result"></div>
-
-  <h2>数据表</h2>
-  <div id="tables"><em>加载中…</em></div>
-
-  <h2>运行环境</h2>
-  <table>
-    <tr><th>项目</th><th>值</th></tr>
-    <tr><td>Python</td><td><code>{{ env.python }}</code></td></tr>
-    <tr><td>平台</td><td><code>{{ env.platform }}</code></td></tr>
-    <tr><td>Flask</td><td><code>{{ env.flask }}</code></td></tr>
-    <tr><td>pytest</td><td><code>{{ env.pytest }}</code></td></tr>
-  </table>
-
-  <footer>MiniDB · 中南大学《大型平台软件设计实习》课程设计</footer>
-
-  <script>
-    async function runSql() {
-      const sql = document.getElementById('sql').value;
-      const box = document.getElementById('result');
-      box.innerHTML = '<em>执行中…</em>';
-      try {
-        const resp = await fetch('/api/sql', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ sql: sql })
-        });
-        const data = await resp.json();
-        if (!data.ok) {
-          box.innerHTML = '<div class="err">' + escapeHtml(data.error || '执行失败') + '</div>';
-        } else if (data.kind === 'SELECT') {
-          box.innerHTML = renderTable(data.columns, data.rows);
-        } else {
-          box.innerHTML = '<div class="msg ok">' + escapeHtml(data.message || data.kind) + '</div>';
-        }
-        loadTables();
-      } catch (e) {
-        box.innerHTML = '<div class="err">请求失败：' + escapeHtml(String(e)) + '</div>';
-      }
-    }
-
-    function renderTable(columns, rows) {
-      if (!columns.length) return '<div class="msg">(empty result)</div>';
-      let html = '<table><tr>' + columns.map(c => '<th>' + escapeHtml(c) + '</th>').join('') + '</tr>';
-      for (const row of rows) {
-        html += '<tr>' + row.map(v => '<td>' + escapeHtml(v === null ? 'NULL' : String(v)) + '</td>').join('') + '</tr>';
-      }
-      return html + '</table>';
-    }
-
-    async function loadTables() {
-      const box = document.getElementById('tables');
-      try {
-        const resp = await fetch('/api/tables');
-        const data = await resp.json();
-        const ts = data.tables || [];
-        if (!ts.length) { box.innerHTML = '<em>(空数据库)</em>'; return; }
-        let html = '<table><tr><th>表名</th><th>列定义</th></tr>';
-        for (const t of ts) {
-          const cols = (t.columns || []).map(c => c.name + ' ' + c.type).join(', ');
-          html += '<tr><td>' + escapeHtml(t.name) + '</td><td>' + escapeHtml(cols) + '</td></tr>';
-        }
-        box.innerHTML = html + '</table>';
-      } catch (e) {
-        box.innerHTML = '<div class="err">加载表失败</div>';
-      }
-    }
-
-    function escapeHtml(s) {
-      return String(s).replace(/[&<>"']/g, m => ({
-        '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'
-      }[m]));
-    }
-
-    document.getElementById('sql').addEventListener('keydown', function (e) {
-      if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') runSql();
-    });
-    loadTables();
-  </script>
+  <div id="root">
+    {% if not react_js %}
+    <div class="boot-hint">
+      <h1>React 前端尚未构建</h1>
+      <p>前端源码位于 <code>web/frontend/</code>，构建后即可使用完整控制台界面：</p>
+      <ul>
+        <li><code>cd web/frontend</code></li>
+        <li><code>npm install</code></li>
+        <li><code>npm run build</code> → 产物输出到 <code>web/static/react/</code></li>
+      </ul>
+      <p>REST API 已可用：<code>GET /api/health</code>、<code>POST /api/sql</code>、<code>GET /api/tables</code>、<code>GET /api/stats</code></p>
+    </div>
+    {% endif %}
+  </div>
+  {% if react_js %}<script type="module" src="{{ url_for('static', filename=react_js) }}"></script>{% endif %}
 </body>
 </html>
