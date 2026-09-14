@@ -13,6 +13,7 @@ web/static/react/，由本应用静态托管；前端源码未构建时首页给
 启动方式：
     python -m web.app            # http://127.0.0.1:5000
 """
+import atexit
 import platform
 import sys
 from pathlib import Path
@@ -58,6 +59,25 @@ def get_db() -> Database:
     if _db is None:
         _db = Database(data_dir="data")
     return _db
+
+
+def _shutdown_db() -> None:
+    """进程退出时持久化目录并刷盘（与 CLI 的 quit 退出路径一致）。
+
+    写操作只把数据页/目录页标记为脏（留在 BufferPool 缓存中），
+    落盘发生在 Database.close() 的 Checkpoint。CLI 在 cmdloop 的
+    finally 中保证 close；Web 进程此前无人调用 close，导致退出后
+    缓存中的数据与目录全部丢失。此钩子在 Flask 服务停止
+    （Ctrl-C / 正常退出）时补齐该环节。
+    """
+    if _db is not None:
+        try:
+            _db.close()
+        except Exception:  # pragma: no cover - 退出阶段刷盘失败不再抛出
+            pass
+
+
+atexit.register(_shutdown_db)
 
 
 def create_app():
