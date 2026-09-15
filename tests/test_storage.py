@@ -201,7 +201,7 @@ def test_tc_st04_fifo_different_from_lru(tmp_path):
     fm.close()
 
 
-def test_switch_policy_keeps_cache(tmp_path):
+def test_tc_st04_switch_policy_preserves_cache(tmp_path):
     fm = FileManager(str(tmp_path))
     bp = BufferPool(fm, capacity=4, policy="LRU")
     p1, p2 = fm.allocate_page(), fm.allocate_page()
@@ -239,7 +239,7 @@ def test_tc_st05_flush_page_clears_dirty(storage):
     assert pid not in storage.bp.dirty_page_ids()
 
 
-def test_checkpoint_flushes_all_dirty_pages(storage):
+def test_tc_st05_checkpoint_flushes_all_dirty_pages(storage):
     pids = [storage.allocate_page() for _ in range(5)]
     for pid in pids:
         storage.write_page(pid, b"data-%d" % pid)
