@@ -270,6 +270,20 @@ def test_tc_st06_free_list_tracks_multiple_releases(storage):
     assert storage.allocate_page() in (pids[1], pids[3])
 
 
+def test_tc_st06_append_allocation_preserves_released_pages(tmp_path):
+    fm = FileManager(str(tmp_path))
+    first, second = fm.allocate_page(), fm.allocate_page()
+    fm.release_page(first)
+
+    appended = fm.allocate_new_page()
+
+    assert appended == 3
+    assert fm.free_count == 1
+    assert fm.allocate_page() == first
+    assert fm.read_page(second) == b"\x00" * PAGE_SIZE
+    fm.close()
+
+
 # ======================================================================
 # 持久化(FR-2.4 / TC-E2E-05 存储层):重启后数据不丢失
 # ======================================================================
