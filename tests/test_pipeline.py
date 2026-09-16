@@ -1,4 +1,8 @@
-"""编译流水线测试(对应 SRS FR-1.5:Token 流 → AST → 语义检查 → 执行计划)。"""
+"""编译流水线测试(对应 SRS FR-1.5:Token 流 → AST → 语义检查 → 执行计划)。
+   测试目标
+   --------
+   验证 sql_compiler.pipeline(sql, catalog) 作为“一站式编译入口”的行为。
+"""
 import os
 import sys
 

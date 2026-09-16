@@ -8,6 +8,12 @@
 
 任意单个测试模块同样暴露统一启动方法 run_tests()，可直接运行：
     python tests/test_engine.py
+
+    设计说明
+    - 本文件只做“入口编排”，真正的 pytest 调用委托给 runner.run_all；
+    - 无附加参数时默认 -v；一旦有参数则完全透传，避免 -v 与 -q 并存冲突；
+    - 任意单个测试模块同样暴露统一启动方法 run_tests()，可直接运行：
+          python tests/test_engine.py
 """
 import os
 import sys

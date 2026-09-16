@@ -8,6 +8,10 @@
                              幂等性、无谓词计划不变、diff 展示
     C. 引擎级语义保真       优化前（未折叠执行）与优化后计划执行结果一致，
                              证明优化不改变查询语义（P5 规则优化核心准则）
+
+运行方式
+    python tests/test_optimizer.py
+    pytest tests/test_optimizer.py -v
 """
 import os
 import sys

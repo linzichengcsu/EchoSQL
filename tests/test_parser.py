@@ -1,4 +1,8 @@
-"""语法分析器单元测试(对应测试文档 3.1.2 TC-P-01 ~ TC-P-05)。"""
+"""语法分析器单元测试(对应测试文档 3.1.2 TC-P-01 ~ TC-P-05)。
+   测试目标
+   --------
+   验证递归下降语法分析器 parse(lex(sql)) 对 MiniDB SQL 子集的解析正确性。
+"""
 import os
 import sys
 
@@ -25,6 +29,7 @@ from sql_compiler.ast_nodes import (
 
 
 def test_tc_p01_create_table_ast():
+     """TC-P-01：CREATE TABLE 应解析为单个 CreateTableStmt。"""
     ast = parse(lex("CREATE TABLE t(a INT, b VARCHAR);"))
     assert len(ast.statements) == 1
     stmt = ast.statements[0]
@@ -39,6 +44,7 @@ def test_tc_p01_create_table_ast():
 
 
 def test_tc_p02_select_with_where():
+      """TC-P-02：SELECT * FROM t WHERE a=1 应解析出 WHERE 比较表达式。"""
     ast = parse(lex("SELECT * FROM t WHERE a=1;"))
     stmt = ast.statements[0]
     assert isinstance(stmt, SelectStmt)
@@ -52,6 +58,7 @@ def test_tc_p02_select_with_where():
 
 
 def test_tc_p03_and_binds_tighter_than_or():
+     """TC-P-03：a=1 OR b=2 AND c=3 应解析为 OR(a=1, AND(b=2, c=3))。"""
     ast = parse(lex("SELECT a FROM t WHERE a=1 OR b=2 AND c=3;"))
     where = ast.statements[0].where
     assert isinstance(where, BinaryExpr)

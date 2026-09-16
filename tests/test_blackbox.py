@@ -51,6 +51,7 @@ WEB_CASES = [c for c in ALL_CASES if c["layer"] == "web"]
 # ======================================================================
 
 def _cell_eq(expected, actual):
+     """单元格相等比较：None 精确匹配；任一为 float 时按 1e-9 容差比较。"""
     if expected is None or actual is None:
         return expected is None and actual is None
     if isinstance(expected, float) or isinstance(actual, float):
@@ -62,6 +63,7 @@ def _cell_eq(expected, actual):
 
 
 def _rows_eq(expected_rows, actual_rows):
+    """二维行集相等比较：先比行数，再逐行逐列比较（含类型差异容忍）。"""
     if len(expected_rows) != len(actual_rows):
         return False
     for er, ar in zip(expected_rows, actual_rows):
@@ -84,6 +86,7 @@ def _json_has(data, subset):
 
 
 def _value_eq(want, got):
+     """递归值比较：dict/list 子集语义；float 容差；其余精确相等。"""
     if isinstance(want, dict):
         return isinstance(got, dict) and _json_has(got, want)
     if isinstance(want, (list, tuple)):

@@ -2,6 +2,10 @@
 
 验证 Flask 层 /api/sql、/api/tables、/api/health 与引擎贯通，
 以及错误 SQL 返回结构化错误而非崩溃。
+
+隔离策略
+通过 monkeypatch 替换 web.app.get_db，使共享数据库指向 pytest 临时目录，
+避免污染真实 data/ 目录，并保证用例之间互不影响。
 """
 import os
 import sys

@@ -7,6 +7,12 @@
     TC-ST-05  脏页刷盘(flush_page):刷盘后磁盘与内存一致          P0
     TC-ST-06  空闲页回收与再分配:释放的页可被重新分配            P1
     补充      重启持久化(TC-E2E-05 存储层 / FR-2.4)、错误处理
+
+    测试分层
+    --------
+        FileManager  —— 物理页文件：分配/释放/读写、页表持久化
+        BufferPool   —— 页缓存：LRU/FIFO 替换、命中率、逐出日志、脏页
+        Storage      —— 门面：组合上述两者，向上层暴露一致接口
 """
 import os
 import sys
