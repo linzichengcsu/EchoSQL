@@ -1,5 +1,7 @@
 """MiniDB Flask Web 应用（P4：接入数据库引擎；P7：接入 React 前端）。
 
+（对外服务接口层，flask实现，工厂应用模式）
+
 提供 Web 控制台与 REST API（SRS 2.3「也可通过 API 调用」）：
     GET  /             Web 控制台（React + Ant Design 单页应用）
     GET  /api/health   健康检查（环境与依赖版本）
