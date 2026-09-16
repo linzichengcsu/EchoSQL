@@ -1,6 +1,8 @@
 """MiniDB Flask Web 应用（P4：接入数据库引擎；P7：接入 React 前端）。
 
-（对外服务接口层，flask实现，工厂应用模式）
+（对外服务接口层，flask实现，工厂应用模式）：
+     - 不实现 SQL 解析/执行/存储逻辑，仅做 HTTP 与 engine.Database 之间的编排；
+     - 通过 create_app() 构造应用，便于测试时替换 get_db 与配置
 
 提供 Web 控制台与 REST API（SRS 2.3「也可通过 API 调用」）：
     GET  /             Web 控制台（React + Ant Design 单页应用）
