@@ -9,12 +9,19 @@ P4 阶段接入数据库引擎，提供完整 SQL 命令行：
     python main.py -f demo.sql          # 执行 SQL 脚本文件（批处理）
     python main.py --data-dir tmp       # 指定数据目录（默认 data）
     python main.py --policy FIFO        # 页缓存替换策略（LRU/FIFO）
+
+    模块职责：
+        - 解析命令行参数；
+        - 提供环境自检命令 doctor；
+        - 根据参数选择进入交互式 REPL 或批处理执行 SQL 脚本；
+        - 创建并持有 Database 引擎实例，并将其注入 CLI 层。
 """
 import argparse
 import sys
 
 
 def cmd_doctor() -> int:
+     """执行开发环境自检并打印依赖版本信息。"""
     from importlib.metadata import version as _pkg_version
 
     def _ver(pkg: str) -> str:
@@ -33,6 +40,7 @@ def cmd_doctor() -> int:
 
 
 def main(argv=None) -> int:
+     """MiniDB 命令行主入口。"""
     parser = argparse.ArgumentParser(prog="minidb", description="MiniDB 数据库管理系统")
     sub = parser.add_subparsers(dest="command")
     sub.add_parser("doctor", help="环境自检")
