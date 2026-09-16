@@ -201,7 +201,7 @@ def test_tc_st04_fifo_different_from_lru(tmp_path):
     fm.close()
 
 
-def test_switch_policy_keeps_cache(tmp_path):
+def test_tc_st04_switch_policy_preserves_cache(tmp_path):
     fm = FileManager(str(tmp_path))
     bp = BufferPool(fm, capacity=4, policy="LRU")
     p1, p2 = fm.allocate_page(), fm.allocate_page()
@@ -239,7 +239,7 @@ def test_tc_st05_flush_page_clears_dirty(storage):
     assert pid not in storage.bp.dirty_page_ids()
 
 
-def test_checkpoint_flushes_all_dirty_pages(storage):
+def test_tc_st05_checkpoint_flushes_all_dirty_pages(storage):
     pids = [storage.allocate_page() for _ in range(5)]
     for pid in pids:
         storage.write_page(pid, b"data-%d" % pid)
@@ -268,6 +268,20 @@ def test_tc_st06_free_list_tracks_multiple_releases(storage):
     assert storage.fm.free_count == 2
     # 再分配优先复用空闲页
     assert storage.allocate_page() in (pids[1], pids[3])
+
+
+def test_tc_st06_append_allocation_preserves_released_pages(tmp_path):
+    fm = FileManager(str(tmp_path))
+    first, second = fm.allocate_page(), fm.allocate_page()
+    fm.release_page(first)
+
+    appended = fm.allocate_new_page()
+
+    assert appended == 3
+    assert fm.free_count == 1
+    assert fm.allocate_page() == first
+    assert fm.read_page(second) == b"\x00" * PAGE_SIZE
+    fm.close()
 
 
 # ======================================================================

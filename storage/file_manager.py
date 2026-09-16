@@ -159,7 +159,9 @@ class FileManager:
                 "page table full, cannot allocate page %d" % page_id
             )
         self.page_count += 1
-        self._bitmap = bytearray(self._bitmap_len())
+        bitmap = bytearray(self._bitmap_len())
+        bitmap[:len(self._bitmap)] = self._bitmap
+        self._bitmap = bitmap
         # 在文件末尾预留一页全零空间,保证后续可读
         self._file.seek(page_id * PAGE_SIZE)
         self._file.write(b"\x00" * PAGE_SIZE)
