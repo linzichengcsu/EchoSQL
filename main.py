@@ -21,7 +21,7 @@ import sys
 
 
 def cmd_doctor() -> int:
-     """执行开发环境自检并打印依赖版本信息。"""
+     #执行开发环境自检并打印依赖版本信息。
     from importlib.metadata import version as _pkg_version
 
     def _ver(pkg: str) -> str:
@@ -40,7 +40,7 @@ def cmd_doctor() -> int:
 
 
 def main(argv=None) -> int:
-     """MiniDB 命令行主入口。"""
+     #MiniDB 命令行主入口。
     parser = argparse.ArgumentParser(prog="minidb", description="MiniDB 数据库管理系统")
     sub = parser.add_subparsers(dest="command")
     sub.add_parser("doctor", help="环境自检")
