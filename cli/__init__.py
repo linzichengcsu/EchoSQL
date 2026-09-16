@@ -3,6 +3,11 @@
 提供 MiniDB 交互式命令行（进入时打印支持语句与辅助命令说明）（标准库 cmd，推荐技术栈指导文档第 5 章）：
 输入 SQL 并返回执行结果或错误信息，支持多语句与 `-f file.sql` 批处理。
 
+错误处理约定
+- 编译期错误（词法/语法/语义）统一为 SQLError 子类，携带 [类型, 行:列, 原因]；
+- 运行期错误（存储/行编码等）统一为 EngineError，携带 [EngineError, 原因]；
+- CLI 层只“打印错误”，不向上抛异常，保证 REPL 与批处理不会崩溃。
+
 交互示例（SRS 5.1）：
     MiniDB> CREATE TABLE student(id INT, name VARCHAR, age INT);
     OK
